@@ -5,7 +5,9 @@
 - **Requiere**: Node.js 20 o superior, en Windows o Linux
 - **Historial de cambios**: [CHANGELOG.md](CHANGELOG.md)
 - **Licencia**: MIT para el código; el banner y el nombre quedan fuera ([LICENSE](LICENSE))
-- **Estado**: v0.1.0 sin etiquetar, en desarrollo — el repositorio es privado por ahora Detecta tu máquina (Windows/Linux), elige engine, build exacta, RAM, GC, distancias y plugins/mods de rendimiento, instala todo y **deja el server arrancable con un script**. Y cuando está listo, el **Doctor** hace un dry run: cuenta errores y warnings, arregla lo seguro y te pregunta antes de tocar nada considerable.
+- **Estado**: v0.1.0 sin etiquetar, en desarrollo — el repositorio es privado por ahora
+
+Detecta tu máquina (Windows/Linux), elige engine, build exacta, RAM, GC, distancias y plugins/mods de rendimiento, instala todo y **deja el server arrancable con un script**. Y cuando está listo, el **Doctor** hace un dry run: cuenta errores y warnings, arregla lo seguro y te pregunta antes de tocar nada considerable.
 
 Misma arquitectura que DistroForge: TypeScript ESM + generadores puros (`FileMap`), proyecto con `openblock.json` de round-trip, zip portable, vitest. Presentación estilo Minecraft (splash texts, logros, barras de cofre).
 
@@ -30,6 +32,7 @@ openblock generate --zip server.zip    # proyecto portable sin instalar
 openblock doctor --dir ./server       # mini-IA: dry run + fixes
 openblock backup --dir ./server
 openblock stop   --dir ./server       # apagado limpio por RCON
+openblock self-test          # instala un Paper real, lo arranca y lo diagnostica
 npm test
 ```
 
@@ -90,14 +93,38 @@ src/
   plan.ts           manifiesto de descargas (builds exactas + custom items) resuelto por API
   apply.ts          ejecuta: escribe, baja, instala, pregenera por RCON
   doctor.ts         mini-IA: reglas estáticas + de log, boot test, fixes, score
+  selftest.ts       self-test: instala un Paper real, lo arranca y lo diagnostica
+  cli.ts            parseo de flags y política de escritura del doctor
   guided.ts         wizard · advanced.ts flags · index.ts CLI · rcon.ts · ui.ts (estilo MC)
-tests/              vitest (62): tiers, flags Aikar exactos, properties, rcon codec,
-                    mrpack, doctor, pureza del núcleo y barrido de "undefined"
+tests/              vitest (86): tiers, flags Aikar exactos, properties, rcon codec,
+                    mrpack, doctor, pureza del núcleo, veredicto del self-test y
+                    barrido de "undefined"
 ```
 
 `generators/` no importa `node:*` ni lanza: construye contenido y nada más. La E/S
 está en `output.ts` y `apply.ts`. `tests/purity.test.ts` lo comprueba, así que la
 regla no depende de que alguien se acuerde.
+
+## Verificación
+
+Dos niveles, porque la suite sola no basta:
+
+```bash
+npm test      # 86 tests: unitarios, sin arrancar ningún server
+npm run smoke # self-test: instala, arranca y diagnostica un Paper de verdad
+```
+
+`self-test` existe por un motivo concreto: la suite pasa sin tocar un JAR, y por
+ahí se coló un bug que 77 tests daban por bueno (`doctor --yes` dejó de aplicar
+fixes). El self-test comprueba lo que los tests no pueden: instalación real,
+arranque real (`Done`), diagnóstico limpio sobre un server recién forjado, que el
+modo de solo lectura no escriba nada, y apagado limpio por RCON. Falla con código
+de salida distinto de cero, así que sirve de gate en CI
+(`.github/workflows/ci.yml`, job `smoke`). Es el equivalente del smoke test de
+QEMU que DistroForge corre sobre su ISO.
+
+Opciones: `--mc 1.20.4` (su Java debe existir en la máquina; por defecto 1.20.4,
+que va con Java 17), `--port 25599` y `--keep` para no borrar el directorio.
 
 ## Por qué existe
 

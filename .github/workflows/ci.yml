@@ -23,3 +23,28 @@ jobs:
         run: npm run build
       - name: Tests
         run: npm test
+
+  smoke:
+    # Instala un Paper de verdad, lo arranca y lo diagnostica. Es el único job que
+    # toca un server real: la suite unitaria nunca arranca uno, y por ahí se coló
+    # un bug (`--yes` dejó de aplicar fixes) que 77 tests daban por bueno.
+    # Es el equivalente del smoke test de QEMU que DistroForge corre sobre su ISO.
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - name: Java 21 (Paper 1.20.4+ lo exige)
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - name: Dependencias
+        run: npm ci
+      - name: Instala, arranca y diagnostica un server real
+        run: npm run smoke

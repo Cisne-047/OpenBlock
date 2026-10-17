@@ -23,7 +23,10 @@ OpenBlock es el hermano de [DistroForge](https://github.com/cisne-047/DistroForg
   - `.gitattributes` y `.editorconfig` nuevos. El primero **no es cosmético**: los `start.sh` generados llevan shebang y se rompen con CRLF, así que `*.sh` queda forzado a LF y `*.ps1`/`*.bat` a CRLF.
   - `.gitignore` ampliado: además de `node_modules/` y `dist/`, ignora `server/`, `openblock-work/` y `.env*` para que no se versionen mundos, EULA ni contraseñas de RCON.
   - `package.json`: `engines.node >=20`, `os` limitado a lo que el código soporta (win32/linux) y `license`. Sin `repository`: el repositorio es privado y aún no tiene remoto.
-- **Suite de invariantes** (`tests/purity.test.ts`, `tests/helpers.ts`): pureza del núcleo, determinismo de los generadores, barrido de `undefined` sobre 11 configuraciones y factorío de configs compartido. Total: **62 tests en 6 ficheros**.
+- **Suite de invariantes** (`tests/purity.test.ts`, `tests/helpers.ts`): pureza del núcleo, determinismo de los generadores, barrido de `undefined` sobre 11 configuraciones y factorío de configs compartido. Total: **86 tests en 8 ficheros**.
+- **`openblock self-test`, y un job de CI que lo ejecuta.** Instala un Paper de verdad en un directorio temporal, lo arranca (dry run real), lo diagnostica y falla con código de salida distinto de cero si algo no cuadra: instalación, jar descargado, `Done` del arranque, cero findings, que el modo de solo lectura no haya escrito nada, y score 100. El job `smoke` (`.github/workflows/ci.yml`) lo corre con Java 21 en cada push.
+
+  Existe por un motivo concreto, no por completitud: la suite pasa sin tocar un JAR, y por ahí se coló un bug que 77 tests daban por bueno. El veredicto vive en una función pura (`evaluateSelfTest`) precisamente para poder probar el caso **malo**: un verificador del que solo se comprueba el "OK" no verifica nada. Es el equivalente del smoke test de QEMU que DistroForge corre sobre su ISO, y cierra el mismo hueco que él tiene abierto ("ninguna ISO se hornea en CI").
 
 ### Cambiado
 
@@ -45,8 +48,8 @@ OpenBlock es el hermano de [DistroForge](https://github.com/cisne-047/DistroForg
 - **Port a Rust**: el hito compartido con DistroForge. DistroForge **ya lo completó** (`rust/crates/forge-core`, 77 tests espejo de los 74 del TS): la paridad no la sostiene un fichero de versión sino serialización byte-estable, suite espejo y un `diff -r` documentado. OpenBlock sigue en TypeScript y va preparando el terreno: núcleo puro, generadores deterministas y `doctor --json` como contrato (ahora sí, de solo lectura).
 - **El modo avanzado sigue con `strict: false`**: los flags desconocidos se ignoran ahí (el resto de la CLI ya falla con mensaje y lista las opciones válidas). Unificarlo pide decidir antes si `--motd`, `--seed` y compañía entran como flags de primera.
 - **Etiquetar la v0.1.0** y decidir si se publica en npm (`build` no emite nada y `bin`/`files` están sin definir, así que hoy no hay artefacto publicable).
-- **El doctor se ha probado contra un server real, a mano.** Paper 1.20.4 (build 499) instalado con la propia CLI, Java 17 del sistema, heap simétrico `-Xms2048M -Xmx2048M` y Chunky 1.3.146: el dry run arrancó el server (`Done (2.377s)`), lo apagó limpio por RCON y puntuó 100/SANO. Con el problema inyectado a mano, `--json` lo detectó sin tocar el disco y `--yes` lo arregló. **Pero nada de esto corre en CI**: la suite no arranca servers, así que el camino de arranque real solo está verificado por esta prueba manual, no de forma continua.
-- **Versionar ese arranque**: convertir la prueba manual en un job de CI (o un `--self-test`) es el hueco de verificación que queda, y el mismo que DistroForge tiene abierto con sus ISOs: "ninguna ISO se hornea en CI".
+- **El self-test cubre un solo engine y una sola versión**: Paper 1.20.4 por defecto (Java 17) y Java 21 en CI. No arranca Fabric, Forge ni Folia, que son caminos distintos (`run.sh` del installer, `user_jvm_args.txt`). El self-test acota el hueco de CI, no lo cierra del todo.
+- **Los avisos del plan no son fallo**: al instalar se ve `[plan] spark: sin build para 1.20.4`. Es correcto (ese plugin no publica para esa versión y se salta), pero el self-test no lo distingue de un fallo real si algún día deja de ser intencionado.
 
 ## Versiones anteriores
 

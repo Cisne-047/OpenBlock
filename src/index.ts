@@ -137,6 +137,17 @@ async function doctorCmd(rest: string[]): Promise<void> {
   if (report.score < 40) process.exitCode = 1;
 }
 
+async function selfTestCmd(rest: string[]): Promise<void> {
+  const { values } = parseFlags(rest, { strings: ["mc", "port"], booleans: ["keep"] });
+  const { runSelfTest } = await import("./selftest");
+  const code = await runSelfTest({
+    mc: typeof values.mc === "string" ? values.mc : undefined,
+    port: typeof values.port === "string" ? Number(values.port) : undefined,
+    keep: values.keep === true,
+  });
+  process.exitCode = code;
+}
+
 async function main(): Promise<void> {
   banner();
   const argv = process.argv.slice(2);
@@ -181,6 +192,11 @@ async function main(): Promise<void> {
       break;
     case "doctor": {
       await doctorCmd(rest);
+      break;
+    }
+    case "self-test":
+    case "smoke": {
+      await selfTestCmd(rest);
       break;
     }
     case "help":

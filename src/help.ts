@@ -31,6 +31,11 @@ OpenBlock — forja servidores de Minecraft según tu hardware (Windows/Linux)
   openblock info --dir ./server  Config del server instalado
   openblock backup --dir ./server   Ejecuta backup.sh/.ps1 ahora
   openblock stop --dir ./server  Apaga por RCON
+  openblock self-test            Instala un Paper de verdad, lo arranca y lo
+                                 diagnostica; falla si algo no cuadra. Para CI.
+      --mc 1.20.4                versión a instalar (su Java debe existir)
+      --port 25599               puerto del server de prueba
+      --keep                     no borra el directorio temporal
   openblock help                 Esta ayuda
 
 Advanced extras: --build N (paper/purpur/folia/forge/neoforge), --loader-build N,

@@ -15,7 +15,8 @@
   "scripts": {
     "openblock": "tsx src/index.ts",
     "build": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "smoke": "tsx src/index.ts self-test"
   },
   "dependencies": {
     "jszip": "^3.10.1"
