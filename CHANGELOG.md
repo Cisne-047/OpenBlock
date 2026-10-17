@@ -2,7 +2,33 @@
 
 Las etiquetas del repositorio siguen `vX.Y.Z`. La v0.1.0 cierra el trabajo acumulado desde el primer commit: OpenBlock instala, arranca y diagnostica servers de Minecraft.
 
-OpenBlock es el hermano de [DistroForge](https://github.com/cisne-047/DistroForge) (que forja distros Linux): comparten arquitectura —config declarativa, generadores puros que producen un `FileMap`, round-trip del proyecto y suite vitest— pero **no comparten código**. Aquí se registra solo lo que cambia en OpenBlock, que sigue en **TypeScript**: el port a Rust es un hito pendiente, no algo empezado.
+OpenBlock es el hermano de [DistroForge](https://github.com/cisne-047/DistroForge) (que forja distros Linux): comparten arquitectura —config declarativa, generadores puros que producen un `FileMap`, round-trip del proyecto y suite vitest— pero **no comparten código**. Aquí se registra solo lo que cambia en OpenBlock. Lo que se **publica** sigue siendo el TypeScript: el port a Rust vive en `rust/` y avanza con paridad byte a byte contra el TS, que es la referencia y no se mueve a `legacy/` hasta que el binario sea lo que se distribuye.
+
+## Sin publicar
+
+### El port a Rust
+
+Trabajo en `rust/`, fuera de lo que se publica en npm. Estado por módulo,
+divergencias y receta en [`rust/README.md`](rust/README.md).
+
+- **Núcleo generador completo y con paridad byte a byte**: los 23 ficheros del
+  proyecto salen idénticos al TS, `openblock.json` incluido, y los tiers coinciden
+  en 21 perfiles de hardware.
+- **Portado también**: catálogo, códec y cliente RCON, benchmark, parsers de
+  modpack, Mojang piston-meta, la aritmética del doctor (score, nota, dedupe) y
+  `api::engines` (PaperMC, Purpur, Folia, Fabric, Quilt, Forge, NeoForge).
+- **Pendiente**: el resolver de `plan`, las reglas del doctor, `apply`/`java` y el
+  resto de la CLI.
+- **El TS se ha partido en dos** para que el puerto tenga qué comparar: cada
+  función de red tiene al lado su mapeo puro (`paperBuilds` / `paperBuildsFrom`).
+  Sin cambio de comportamiento; 14 tests nuevos en `tests/engines.test.ts` que
+  fijan las rarezas que el port reproduce a propósito.
+
+### Añadido
+
+- `src/version.ts` como única fuente de la versión y del `User-Agent`.
+- `tests/engines.test.ts`: los quiebres del resolvedor de descargas, como
+  contrato del port.
 
 ## v0.1.0 (publicada en npm el 17/10/2026)
 

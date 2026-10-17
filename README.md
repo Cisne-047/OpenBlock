@@ -165,6 +165,8 @@ Su paridad no la sostiene un fichero de versión —no lo tiene— sino tres cos
 3. **Un `diff -r` documentado**: generar el mismo proyecto con las dos
    implementaciones y comparar; byte a byte idénticos.
 
-OpenBlock prepara ese camino: núcleo puro, generadores deterministas y
-`doctor --json` como contrato de verificación.
+OpenBlock va por ese camino: núcleo puro, generadores deterministas y
+`doctor --json` como contrato de verificación. El port está en `rust/`, con su
+propio [`rust/README.md`](rust/README.md) —estado por módulo, divergencias
+conocidas y la receta para seguir—. Lo publicado sigue siendo el TypeScript.
 

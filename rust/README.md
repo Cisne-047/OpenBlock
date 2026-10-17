@@ -40,7 +40,8 @@ vigila al otro lado. `forge-api` es el único que hace red, igual que en el TS s
 | `hw::bench` | portado: el score, el xorshift y la medición |
 | `api::mojang` | portado (red + parte pura con fixture) |
 | `modrinth` (parsers de modpack) | portado |
-| `api::engines` y el cliente de Modrinth | pendiente |
+| `api::engines` | portado (con `url` y `js` de apoyo) |
+| cliente de Modrinth (red) | pendiente, los parsers ya están |
 | `plan` (resolver el manifiesto) | pendiente |
 | `doctor` (aritmética: score, nota, dedupe) | portado |
 | `doctor` (reglas, boot, arreglos) | pendiente |
@@ -52,7 +53,9 @@ también, con 21 perfiles de hardware comparados contra el TS.
 ## Paridad
 
 El núcleo Rust se compara **byte a byte** contra el TypeScript. El golden lo
-genera el TS y lo consume Rust:
+genera el TS y lo consume Rust, en dos sitios: `forge-core/tests/golden` (lo que
+produce el núcleo: ficheros, catálogo, tiers, rcon, doctor) y
+`forge-api/tests/golden` (lo que mapea las respuestas de las APIs).
 
 ```bash
 npm run parity          # regenera el golden y corre los tests de Rust
@@ -147,6 +150,18 @@ Deliberadas y anotadas, como la lista que DistroForge mantiene en su
    `26w14a`, `10.20.30`…), **no** con razonamiento: mis tres primeras lecturas del
    regex eran falsas y el golden las cazó una a una. Si algún día aparece una
    entrada rara, el sitio para añadirla es `tests/parity-golden.ts`.
+5. **`forge-api` sí usa `regex`, y no es un capricho.** `forgeBuilds` del TS
+   construye el patrón con el prefijo de la MC **sin escapar**, así que con
+   `1.20.1` los puntos son comodines y entra `1x20y1-47.2.0`. Reproducir eso a
+   mano es escribir un motor de expresiones regulares: se trae `regex` (cuatro
+   crates, sin C) y **solo** en `forge-api`, que ya no es puro. El núcleo sigue sin
+   regex, y hay un caso en el golden que verifica el comodín.
+6. **Al leer respuestas ajenas, Rust pide el tipo del contrato.** El TS lee con
+   `as` y coacciona. Los casos con golden sí se reproducen —`String(undefined)`,
+   `Number()`, el orden de inserción de las claves, el `id` que desaparece del
+   JSON—, pero una respuesta con otro tipo (un `promos` que no es un objeto, un
+   `sha256: null` donde se espera texto) da error en vez de seguir. Copiar el
+   intérprete de JavaScript no es el objetivo del puerto.
 
 ## Cómo continuar
 
@@ -154,15 +169,22 @@ Deliberadas y anotadas, como la lista que DistroForge mantiene en su
 
 | fichero TS | líneas | a dónde va | por qué |
 |---|---|---|---|
-| `src/api/engines.ts` | 237 | `forge-api` | resuelve URLs de PaperMC/Fabric/Forge contra sus APIs |
-| `src/plan.ts` | 215 | `forge-api` (resolver) + núcleo (modelo, ya portado) | convierte config en manifiesto de descargas |
+| `src/plan.ts` | 215 | `forge-api` (resolver) + núcleo (modelo, ya portado) | convierte config en manifiesto de descargas; con esto `forge generate` funciona de verdad |
+| `src/api/modrinth.ts` | — | `forge-api` | los parsers están; falta la descarga de `.mrpack` |
 | `src/doctor.ts` | 629 | `forge-cli` (la aritmética ya está en el núcleo) | 16 reglas, boot test y fixes; necesita red, disco y RCON |
 | `src/apply.ts`, `java.ts` | 360 | `forge-cli` | escritura, descargas, JDK |
 | `src/advanced.ts`, `guided.ts`, `index.ts` | 729 | `forge-cli` | la CLI completa |
 
 **El doctor es el trozo grande y el que más valor tiene.** El orden que menos
-sufrimiento da: `engines` → `plan` (con eso `forge generate` funciona de verdad) →
-doctor → el resto de la CLI.
+sufrimiento da: `plan` → doctor → el resto de la CLI.
+
+La pauta de `engines` —cada función de red con su parte pura al lado— es la que
+hay que repetir: `paper_builds` hace la petición y `paper_builds_from` mapea la
+respuesta ya parseada, que es lo único que el golden puede comparar. En el TS se
+hizo el mismo corte (`paperBuilds` / `paperBuildsFrom`) precisamente para que el
+puerto tenga contra qué compararse. Los ayudantes puros que salieron de ahí están
+en `forge-api::url` (`encodeURIComponent`, con su conjunto de caracteres exacto) y
+`forge-api::js` (`String()`, `Number()`, el `"undefined"` de un campo ausente).
 
 ### La receta para portar un módulo con paridad
 
@@ -180,7 +202,7 @@ doctor → el resto de la CLI.
 5. **`npm run parity`** y **`cargo clippy --all-targets -- -D warnings`**. El clippy
    del CI es más nuevo que el local y encuentra cosas que aquí no saltan; han sido
    tres veces ya.
-6. **`git diff --exit-code -- rust/crates/forge-core/tests/golden`** para confirmar
+6. **`git diff --exit-code -- rust/crates/*/tests/golden`** para confirmar
    que el golden es reproducible. Tiene que serlo: si guarda algo que depende de la
    versión de Node, el CI falla —pasó con el mensaje de `JSON.parse`—.
 7. **Commit y espera al CI de verdad.** Tres fallos de este port los encontró el CI
@@ -189,11 +211,19 @@ doctor → el resto de la CLI.
 ### Lo que no hay que "arreglar" al portar
 
 El puerto reproduce el original **aunque el original esté discutible**. Ya han
-salido cuatro casos y los cuatro están anotados arriba: el quirk UTF-8/latin1 del
-RCON, el `BigInt` sin límite del benchmark, las dos líneas en blanco del ternario,
-y las entradas sin `env` de los modpacks. Si algo parece un fallo del TS, se
-reproduce y se anota; arreglarlo es otra conversación, y `diff -r` deja de servir
-para verificar el port en cuanto las dos versiones divergen.
+salido seis casos y los seis están anotados arriba: el quirk UTF-8/latin1 del RCON,
+el `BigInt` sin límite del benchmark, las dos líneas en blanco del ternario, las
+entradas sin `env` de los modpacks, el `reduce` de paper v3 que **no** devuelve el
+máximo (con `[5, 6, 7, 6]` sale la 5) y el prefijo de Forge metido en el regex sin
+escapar. Si algo parece un fallo del TS, se reproduce y se anota; arreglarlo es
+otra conversación, y `diff -r` deja de servir para verificar el port en cuanto las
+dos versiones divergen.
+
+Los dos últimos tienen algo en común: **el TS casi siempre hace lo correcto**. La
+API devuelve las builds en orden ascendente y el `reduce` acierta; las versiones de
+Minecraft no llevan comodines y el regex acierta. El puerto no puede apoyarse en
+eso, porque el día que el orden cambie, el TS elegirá una build vieja y el puerto
+tiene que elegir la misma.
 
 ### Qué NO mover a `legacy/`
 
@@ -208,5 +238,5 @@ No arregla el reparto —ese problema ya está resuelto publicando en npm, y
 `cargo install` sería *peor* para el usuario porque le obligaría a tener Rust—.
 Se hace porque un binario único sin dependencia de Node es un final mejor para
 una CLI que la gente va a ejecutar en su máquina, y porque el núcleo ya es puro y
-tiene 87 tests como contrato. El reparto en npm sigue funcionando durante todo el
+tiene 101 tests como contrato. El reparto en npm sigue funcionando durante todo el
 port: no hay una fase en la que OpenBlock esté roto.

@@ -7,5 +7,6 @@ license.workspace = true
 
 [dependencies]
 forge-core = { path = "../forge-core" }
+regex = "1"
 serde.workspace = true
 serde_json.workspace = true

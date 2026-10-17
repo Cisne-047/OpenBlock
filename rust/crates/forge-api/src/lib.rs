@@ -8,8 +8,11 @@
 //! separadas y se compara con el TS. Lo que no se puede comparar es la respuesta
 //! de una API ajena, que cambia sin avisar.
 
+pub mod engines;
+pub mod js;
 pub mod mojang;
 pub mod net;
+pub mod url;
 
 /// Identificador con el que nos presentamos a las APIs de terceros.
 ///

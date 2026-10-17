@@ -22,11 +22,33 @@ import { ENGINES, PERF_ITEMS, javaMajorFor, parseMc, perfItemsFor } from "../src
 import { TIERS, classifyHardware, recommendedGc, recommendedRamMB } from "../src/hw/tiers.js";
 import { encodePacket } from "../src/rcon.js";
 import { cfLoaderKind, mrpackServerFiles, parseCfManifest, parseMrpackIndex } from "../src/api/modrinth.js";
+import {
+  fabricDownloadFrom,
+  fabricInstallerVersionsFrom,
+  fabricLoaderVersionsFrom,
+  forgeBuildsFrom,
+  forgeDownloadFrom,
+  forgePickFrom,
+  latestVersionFrom,
+  neoforgeBuildsFrom,
+  neoforgeDownloadFrom,
+  neoforgePrefix,
+  neoforgeVersionsFrom,
+  paperBuildsFrom,
+  papermcV2From,
+  papermcV3From,
+  purpurBuildsFrom,
+  purpurDownloadFrom,
+  quiltDownloadFrom,
+  quiltInstallerVersionsFrom,
+  quiltLoaderVersionsFrom,
+} from "../src/api/engines.js";
 import { planFor } from "./helpers.js";
 import type { HardwareProfile, ServerConfig } from "../src/types.js";
 
 const raiz = join(fileURLToPath(new URL(".", import.meta.url)), "..");
 const golden = join(raiz, "rust", "crates", "forge-core", "tests", "golden");
+const goldenApi = join(raiz, "rust", "crates", "forge-api", "tests", "golden");
 
 const cfg = JSON.parse(readFileSync(join(raiz, "tests", "fixtures", "parity-config.json"), "utf8")) as ServerConfig;
 const plan = planFor(cfg);
@@ -444,7 +466,155 @@ const doctorGolden = {
 };
 writeFileSync(join(golden, "doctor.json"), JSON.stringify(doctorGolden, null, 2) + "\n", "utf8");
 
+// Engines: el mapeo de las respuestas de las APIs de descarga. La respuesta en sí
+// no se puede comparar (cambia sin avisar), el mapeo sí. `salida_json` es
+// `JSON.stringify` del resultado y no el valor suelto: así la comparación en Rust
+// es byte a byte **incluido el orden de las claves**, que es lo que decide si un
+// plan se puede reimportar.
+//
+// El mensaje de error solo se guarda cuando lo escribimos nosotros. Los que
+// genera V8 (`raw.map is not a function`) cambian entre versiones de Node y ya
+// rompieron este golden una vez: esos casos se prueban por el resultado.
+const goldenEngines = (() => {
+  // Cada caso guarda sus **argumentos posicionales**, no solo la entrada: el test
+  // de Rust llama a su función con los mismos y compara la salida serializada.
+  const captura = (nombre: string, args: unknown[], fn: () => unknown) => {
+    try {
+      return { nombre, args, salida_json: JSON.stringify(fn()) ?? "null", error: null as string | null };
+    } catch (e) {
+      return { nombre, args, salida_json: null, error: e instanceof Error ? e.message : String(e) };
+    }
+  };
+  const caso1 = <A>(nombre: string, a1: A, fn: (a1: A) => unknown) => captura(nombre, [a1], () => fn(a1));
+  const caso2 = <A, B>(nombre: string, a1: A, a2: B, fn: (a1: A, a2: B) => unknown) => captura(nombre, [a1, a2], () => fn(a1, a2));
+  const caso3 = <A, B, C>(nombre: string, a1: A, a2: B, a3: C, fn: (a1: A, a2: B, a3: C) => unknown) =>
+    captura(nombre, [a1, a2, a3], () => fn(a1, a2, a3));
+  const caso4 = <A, B, C, D>(nombre: string, a1: A, a2: B, a3: C, a4: D, fn: (a1: A, a2: B, a3: C, a4: D) => unknown) =>
+    captura(nombre, [a1, a2, a3, a4], () => fn(a1, a2, a3, a4));
+
+  const paperV3 = (id: number, downloads: Record<string, { url: string; sha256?: string; name?: string }>) => ({ id, downloads });
+  const serverDefault = { "server:default": { url: "https://fill.papermc.io/x/paper.jar", sha256: "abc123", name: "paper.jar" } };
+  const v3Lista = [5, 6, 7, 6].map((id) => paperV3(id, serverDefault));
+  const v3SoloMapped = paperV3(3, { "server:mojang-mapped": { url: "https://fill.papermc.io/x/mapped.jar" } });
+  const v3SinSha = paperV3(3, { "server:default": { url: "https://x/y.jar" } });
+  const v2Larga = {
+    builds: [
+      { build: 1, downloads: { application: { url: "u1", name: "n1" } } },
+      { build: 2, downloads: { application: { url: "u2", name: "n2", sha256: "s2" } } },
+    ],
+  };
+  const v2Corta = { builds: [{ build: 1, downloads: { application: { url: "u1", name: "n1" } } }] };
+  const purpurInfo = { build: { build: "1234", download: "x" } };
+  const forgeXml = `<metadata><versioning><versions><version>1.20.1-47.1.0</version><version>1.20.1-47.2.0</version><version>1.20.1-47.3.0</version></versions></versioning></metadata>`;
+  const neoforgeLista = { versions: ["20.2.1", "20.2.2", "20.3.1", "21.1.0", "20.2.1"] };
+
+  return {
+    encode_uri_component: ["1.20.1", "paper", "a b", "ñ/é", "1.20.1+build", "a'b(c)!*~-_.", "日本", "", "100%"].map((entrada) => ({
+      entrada,
+      salida: encodeURIComponent(entrada),
+    })),
+    paper_builds_from: [
+      caso1("ascendente", [{ id: 1 }, { id: 2 }, { id: 3 }], (raw) => paperBuildsFrom(raw)),
+      caso1("orden raro", [{ id: 9 }, { id: 10 }, { id: 2 }], (raw) => paperBuildsFrom(raw)),
+      caso1("con canal", [{ id: 1, channel: "STABLE" }, { id: 2, channel: "BETA" }], (raw) => paperBuildsFrom(raw)),
+      caso1("repetidas", [{ id: 7 }, { id: 7 }], (raw) => paperBuildsFrom(raw)),
+      caso1("vacía", [], (raw) => paperBuildsFrom(raw)),
+      caso1("no es lista", { id: 1 }, (raw) => paperBuildsFrom(raw as never)),
+      caso1("id no numérico", [{ id: "abc" }, { id: 3 }], (raw) => paperBuildsFrom(raw as never)),
+    ],
+    papermc_v3_from: [
+      caso3("build suelta", paperV3(42, serverDefault), "paper", "1.20.1", (raw, project, mc) => papermcV3From(raw, project, mc)),
+      caso3("lista de una", [paperV3(42, serverDefault)], "paper", "1.20.1", (raw, project, mc) => papermcV3From(raw, project, mc)),
+      caso3("lista vacía", [], "paper", "1.20.1", (raw, project, mc) => papermcV3From(raw, project, mc)),
+      // el reduce: con [5,6,7,6] "la última" es la 5, no la 7
+      caso3("el reduce no es el máximo", v3Lista, "paper", "1.20.1", (raw, project, mc) => papermcV3From(raw, project, mc)),
+      caso3("sin server:default", v3SoloMapped, "folia", "1.21.4", (raw, project, mc) => papermcV3From(raw, project, mc)),
+      caso3("sin descargas", paperV3(3, {}), "paper", "1.20.1", (raw, project, mc) => papermcV3From(raw, project, mc)),
+      caso3("sin sha256", v3SinSha, "paper", "1.20.1", (raw, project, mc) => papermcV3From(raw, project, mc)),
+    ],
+    papermc_v2_from: [
+      caso4("sin build pedida", v2Larga, "paper", "1.20.1", null, (data, project, mc, build) => papermcV2From(data, project, mc, build ?? undefined)),
+      caso4("build pedida", v2Larga, "paper", "1.20.1", "1", (data, project, mc, build) => papermcV2From(data, project, mc, build ?? undefined)),
+      caso4("build que no está", v2Corta, "paper", "1.20.1", "99", (data, project, mc, build) => papermcV2From(data, project, mc, build ?? undefined)),
+      caso4("lista vacía", { builds: [] }, "paper", "1.20.1", null, (data, project, mc, build) => papermcV2From(data, project, mc, build ?? undefined)),
+    ],
+    purpur_builds_from: [
+      caso1("varias", { builds: { all: ["1", "2", "3"] } }, (data) => purpurBuildsFrom(data)),
+      caso1("sin builds", {}, (data) => purpurBuildsFrom(data)),
+      caso1("all vacío", { builds: { all: [] } }, (data) => purpurBuildsFrom(data)),
+    ],
+    purpur_download_from: [
+      caso3("build por defecto", purpurInfo, "1.20.1", null, (info, mc, build) => purpurDownloadFrom(info, mc, build ?? undefined)),
+      caso3("build pedida", purpurInfo, "1.20.1", "99", (info, mc, build) => purpurDownloadFrom(info, mc, build ?? undefined)),
+    ],
+    latest_version_from: [
+      caso3("primera sin stable", [{ version: "1" }, { version: "2" }], "version", "https://meta/x", (l, f, u) => latestVersionFrom(l, f, u)),
+      caso3("salta las beta", [{ version: "1", stable: false }, { version: "2" }], "version", "https://meta/x", (l, f, u) =>
+        latestVersionFrom(l, f, u)
+      ),
+      // `String(undefined)` es "undefined": el fallo del TS se reproduce, no se arregla
+      caso3("campo ausente", [{ otro: 1 }], "version", "https://meta/x", (l, f, u) => latestVersionFrom(l, f, u)),
+      caso3("lista vacía", [], "version", "https://meta/x", (l, f, u) => latestVersionFrom(l, f, u)),
+      caso3("casi ninguna estable", [{ version: "1", stable: false }], "version", "https://meta/x", (l, f, u) =>
+        latestVersionFrom(l, f, u)
+      ),
+    ],
+    fabric_loader_versions_from: [
+      caso1("con loader", [{ loader: { version: "0.16.9" }, stable: true }], (l) => fabricLoaderVersionsFrom(l)),
+      caso1("sin loader", [{ version: "0.15.0" }], (l) => fabricLoaderVersionsFrom(l)),
+      caso1("beta", [{ loader: { version: "0.17.0-beta.1" }, stable: false }], (l) => fabricLoaderVersionsFrom(l)),
+      caso1("loader sin version", [{ loader: {}, version: "0.14.0" }], (l) => fabricLoaderVersionsFrom(l as never)),
+      caso1("vacía", [], (l) => fabricLoaderVersionsFrom(l)),
+    ],
+    fabric_installer_versions_from: [
+      caso1("varias", [{ version: "1.0.1", stable: true }, { version: "1.1.0", stable: false }], (l) => fabricInstallerVersionsFrom(l)),
+      caso1("sin version", [{ stable: true }], (l) => fabricInstallerVersionsFrom(l as never)),
+    ],
+    fabric_download_from: [
+      caso3("normal", "1.20.1", "0.16.9", "1.0.1", (mc, loader, installer) => fabricDownloadFrom(mc, loader, installer)),
+      caso3("mc con espacios", "1.20 1", "0.16.9", "1.0.1", (mc, loader, installer) => fabricDownloadFrom(mc, loader, installer)),
+    ],
+    quilt_loader_versions_from: [
+      caso1("con loader", [{ loader: { version: "0.27.0" } }], (l) => quiltLoaderVersionsFrom(l)),
+      caso1("sin loader", [{ version: "0.26.0" }], (l) => quiltLoaderVersionsFrom(l)),
+    ],
+    quilt_installer_versions_from: [caso1("varias", [{ version: "0.9.2" }], (l) => quiltInstallerVersionsFrom(l))],
+    quilt_download_from: [caso3("normal", "1.21", "0.27.0", "0.9.2", (mc, loader, installer) => quiltDownloadFrom(mc, loader, installer))],
+    forge_builds_from: [
+      caso2("metadata normal", forgeXml, "1.20.1", (xml, mc) => forgeBuildsFrom(xml, mc)),
+      // el prefijo va sin escapar: los puntos son comodines y esto entra igual
+      caso2("los puntos son comodines", `<version>1x20y1-47.2.0</version>`, "1.20.1", (xml, mc) => forgeBuildsFrom(xml, mc)),
+      // el Set quita el duplicado por la primera aparición y luego se invierte
+      caso2("duplicadas", `<version>1.20.1-a</version><version>1.20.1-b</version><version>1.20.1-a</version>`, "1.20.1", (xml, mc) =>
+        forgeBuildsFrom(xml, mc)
+      ),
+      caso2("otra mc", `<version>1.20.1-47.2.0</version>`, "1.19.2", (xml, mc) => forgeBuildsFrom(xml, mc)),
+      caso2("sin versiones", `<metadata/>`, "1.20.1", (xml, mc) => forgeBuildsFrom(xml, mc)),
+    ],
+    forge_pick_from: [
+      caso2("recommended gana", { promos: { "1.20.1-recommended": "47.2.0", "1.20.1-latest": "47.3.0" } }, "1.20.1", (p, mc) =>
+        forgePickFrom(p, mc)
+      ),
+      caso2("solo latest", { promos: { "1.20.1-latest": "47.3.0" } }, "1.20.1", (p, mc) => forgePickFrom(p, mc)),
+      caso2("ninguna", { promos: {} }, "1.20.1", (p, mc) => forgePickFrom(p, mc)),
+      caso2("vacía no vale", { promos: { "1.20.1-recommended": "" } }, "1.20.1", (p, mc) => forgePickFrom(p, mc)),
+    ],
+    forge_download_from: [caso2("normal", "1.20.1", "47.2.0", (mc, chosen) => forgeDownloadFrom(mc, chosen))],
+    neoforge_prefix: ["1.20.2", "1.21.4", "1", "20.2", ""].map((entrada) => ({ entrada, salida: neoforgePrefix(entrada) })),
+    neoforge_versions_from: [
+      caso2("filtra por prefijo", neoforgeLista, "1.20.2", (data, mc) => neoforgeVersionsFrom(data, mc)),
+      caso2("sin candidatas", { versions: ["20.2.1"] }, "1.21.4", (data, mc) => neoforgeVersionsFrom(data, mc)),
+      // el prefijo de "1" es "": `startsWith(".")` no lo cumple ninguna
+      caso2("mc sin segmentos", { versions: ["20.2.1"] }, "1", (data, mc) => neoforgeVersionsFrom(data, mc)),
+    ],
+    neoforge_builds_from: [caso2("invierte", { versions: ["20.2.1", "20.2.2"] }, "1.20.2", (data, mc) => neoforgeBuildsFrom(data, mc))],
+    neoforge_download_from: [caso2("normal", "1.20.2", "20.2.2", (mc, chosen) => neoforgeDownloadFrom(mc, chosen))],
+  };
+})();
+mkdirSync(goldenApi, { recursive: true });
+writeFileSync(join(goldenApi, "engines.json"), JSON.stringify(goldenEngines, null, 2) + "\n", "utf8");
+
 console.log(
-  `golden: ${Object.keys(sueltos).length} generadores de hoja + ${Object.keys(proyecto).length} ficheros de proyecto + catálogo + ${tiersGolden.casos.length} perfiles + ${rconGolden.casos.length} paquetes RCON + ${benchGolden.cpuScore.length} scores + ${modpackGolden.mrpack.length + modpackGolden.curseforge.length + modpackGolden.noModpack.length} casos de modpack + ${doctorGolden.scores.length} scores del doctor`
+  `golden: ${Object.keys(sueltos).length} generadores de hoja + ${Object.keys(proyecto).length} ficheros de proyecto + catálogo + ${tiersGolden.casos.length} perfiles + ${rconGolden.casos.length} paquetes RCON + ${benchGolden.cpuScore.length} scores + ${modpackGolden.mrpack.length + modpackGolden.curseforge.length + modpackGolden.noModpack.length} casos de modpack + ${doctorGolden.scores.length} scores del doctor + ${goldenEngines.encode_uri_component.length + Object.values(goldenEngines).reduce((n, v) => n + (Array.isArray(v) ? v.length : 0), 0)} casos de engines`
 );
 console.log(`en ${golden}`);
