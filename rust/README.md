@@ -46,7 +46,7 @@ vigila al otro lado. `forge-api` es el único que hace red, igual que en el TS s
 | `plan` (resolver el manifiesto) | pendiente |
 | `doctor` (aritmética: score, nota, dedupe) | portado |
 | `doctor` (reglas, boot, arreglos) | pendiente |
-| CLI | `detect`, `dump` y `latest` funcionan |
+| CLI | `detect`, `plan`, `dump`, `latest` y `rcon` funcionan |
 
 **El núcleo generador está completo y con paridad byte a byte**: los 23 ficheros
 del proyecto salen idénticos al TypeScript, `openblock.json` incluido. Los tiers
