@@ -45,7 +45,8 @@ vigila al otro lado. `forge-api` es el único que hace red, igual que en el TS s
 | `.mrpack` (zip) | pendiente: hace falta leer el zip, no solo el índice |
 | `plan` (resolver el manifiesto) | pendiente |
 | `doctor` (aritmética: score, nota, dedupe) | portado |
-| `doctor` (reglas, boot, arreglos) | pendiente |
+| `doctor` (reglas de log) | portado, con sus descripciones |
+| `doctor` (reglas estáticas, boot, arreglos) | pendiente |
 | CLI | `detect`, `plan`, `dump`, `latest` y `rcon` funcionan |
 
 **El núcleo generador está completo y con paridad byte a byte**: los 23 ficheros
@@ -176,12 +177,19 @@ Deliberadas y anotadas, como la lista que DistroForge mantiene en su
    `26w14a`, `10.20.30`…), **no** con razonamiento: mis tres primeras lecturas del
    regex eran falsas y el golden las cazó una a una. Si algún día aparece una
    entrada rara, el sitio para añadirla es `tests/parity-golden.ts`.
-5. **`forge-api` sí usa `regex`, y no es un capricho.** `forgeBuilds` del TS
-   construye el patrón con el prefijo de la MC **sin escapar**, así que con
-   `1.20.1` los puntos son comodines y entra `1x20y1-47.2.0`. Reproducir eso a
-   mano es escribir un motor de expresiones regulares: se trae `regex` (cuatro
-   crates, sin C) y **solo** en `forge-api`, que ya no es puro. El núcleo sigue sin
-   regex, y hay un caso en el golden que verifica el comodín.
+5. **`regex` está en `forge-api` y en el núcleo, y no es un capricho.** Dos sitios,
+   por dos razones distintas:
+   - En `forge-api`, por `forgeBuilds`: el TS construye el patrón con el prefijo de
+     la MC **sin escapar**, así que con `1.20.1` los puntos son comodines y entra
+     `1x20y1-47.2.0`. Reproducir eso a mano es escribir un motor de expresiones
+     regulares. Hay un caso en el golden que verifica el comodín.
+   - En el núcleo, por las **nueve reglas de log del doctor**: alternancias, un
+     grupo opcional y clases de caracteres, sobre líneas de log ajenas. Escribirlas
+     a mano es exactamente como se consigue un doctor que no ve un crash.
+   `parseMc` sigue escrito a mano porque son tres grupos y no compensaba; esto no
+   era lo mismo. Y ojo con `\w`: el del TS es ASCII y el de `regex` es Unicode, así
+   que donde aparece (`([\w-]+)` de `PLUGIN_CRASH`, el slug de Modrinth) la clase va
+   escrita a mano.
 6. **Al leer respuestas ajenas, Rust pide el tipo del contrato.** El TS lee con
    `as` y coacciona. Los casos con golden sí se reproducen —`String(undefined)`,
    `Number()`, el orden de inserción de las claves, el `id` que desaparece del
@@ -196,7 +204,7 @@ Deliberadas y anotadas, como la lista que DistroForge mantiene en su
 | fichero TS | líneas | a dónde va | por qué |
 |---|---|---|---|
 | `src/api/modrinth.ts` | 126 | `forge-api` (la query y la elección) | falta la descarga del `.mrpack` y descomprimir el zip |
-| `src/doctor.ts` | 629 | `forge-cli` (la aritmética ya está en el núcleo) | 16 reglas, boot test y fixes; necesita red, disco y RCON |
+| `src/doctor.ts` | 629 | `forge-cli` (aritmética y reglas de log ya en el núcleo) | quedan las 7 reglas estáticas, el boot test y los `apply` |
 | `src/apply.ts`, `java.ts` | 360 | `forge-cli` | escritura, descargas, JDK |
 | `src/advanced.ts`, `guided.ts`, `index.ts` | 729 | `forge-cli` | la CLI completa |
 

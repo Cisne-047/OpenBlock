@@ -52,7 +52,9 @@ import {
   quiltInstallerVersionsFrom,
   quiltLoaderVersionsFrom,
 } from "../src/api/engines.js";
-import { planFor } from "./helpers.js";import type { HardwareProfile, ServerConfig } from "../src/types.js";
+import { planFor } from "./helpers.js";
+import { evaluateLogRules, LOG_RULES } from "../src/doctor.js";
+import type { DoctorContext, Finding } from "../src/doctor.js";import type { HardwareProfile, ServerConfig } from "../src/types.js";
 
 const raiz = join(fileURLToPath(new URL(".", import.meta.url)), "..");
 const golden = join(raiz, "rust", "crates", "forge-core", "tests", "golden");
@@ -699,6 +701,92 @@ const goldenModrinth = (() => {
   };
 })();
 writeFileSync(join(goldenApi, "modrinth.json"), JSON.stringify(goldenModrinth, null, 2) + "\n", "utf8");
+
+// Doctor: las reglas de log. Son puras —texto y la parte de la config que leen las
+// descripciones— y llevan el detalle que un puerto se salta: **el primer match** de
+// cada regla, no el último ni la suma. Los `apply` no se comparan (son efectos);
+// se compara el hallazgo y los metadatos del fix.
+const goldenDoctorLog = (() => {
+  const captura = (nombre: string, args: unknown[], fn: () => unknown) => {
+    try {
+      return { nombre, args, salida_json: JSON.stringify(fn()) ?? "null", error: null as string | null };
+    } catch (e) {
+      return { nombre, args, salida_json: null, error: e instanceof Error ? e.message : String(e) };
+    }
+  };
+
+  // los `apply` son funciones: `JSON.stringify` las tira sola, pero se proyecta a
+  // mano para que quede explícito qué se compara
+  const proyecta = (f: Finding) => ({
+    severity: f.severity,
+    code: f.code,
+    source: f.source,
+    message: f.message,
+    fix: f.fix ? { code: f.fix.code, description: f.fix.description, considerable: f.fix.considerable } : null,
+  });
+
+  const ctx = (lineas: string[], viewDistance = 8, simulationDistance = 6): DoctorContext => ({
+    cfg: { viewDistance, simulationDistance } as ServerConfig,
+    dir: "/server",
+    logLines: lineas,
+    bootTested: true,
+    bootOk: false,
+  });
+
+  const caso = (nombre: string, lineas: string[], viewDistance = 8, simulationDistance = 6) => {
+    const c = ctx(lineas, viewDistance, simulationDistance);
+    return captura(nombre, [{ lineas, viewDistance, simulationDistance }], () =>
+      evaluateLogRules(c.logLines, c).map(proyecta)
+    );
+  };
+
+  // una línea por regla, en el orden de LOG_RULES
+  const todoDispara = [
+    "[12:00:00] [main/ERROR]: requires running the server with Java 21",
+    "[12:00:00] [main/ERROR]: You need to agree to the EULA in order to run the server",
+    "[12:00:00] [Server thread/ERROR]: Failed to bind to port",
+    "[12:00:00] [Server thread/ERROR]: java.lang.OutOfMemoryError: Java heap space",
+    "[12:00:00] [Server thread/ERROR]: Error occurred while enabling EssentialsX v2.19.2 (Is it up to date?)",
+    "[12:00:00] [Server thread/WARN]: Can't keep up! Is the server overloaded?",
+    "[12:00:00] [Server thread/WARN]: Upgrading level /world to the new version",
+    "[12:00:00] [Server thread/INFO]: Unsupported API version 1.20",
+    "[12:00:00] [Server thread/ERROR]: Failed to load data pack file/world/datapacks/x.zip",
+  ];
+
+  return {
+    reglas: LOG_RULES.map((r) => ({
+      code: r.code,
+      severity: r.severity,
+      message: r.message,
+      tiene_fix: Boolean(r.fix),
+    })),
+    casos: [
+      caso("log vacío", []),
+      caso("una línea que no casa", ["[12:00:00] [Server thread/INFO]: Done (3.2s)! For help, type \"help\""]),
+      caso("todas disparan", todoDispara),
+      // el primero manda: dos líneas con números distintos dan un hallazgo con el 17
+      caso("java: gana la primera línea", [
+        "[12:00:00] [main/ERROR]: requires running the server with Java 17",
+        "[12:00:00] [main/ERROR]: requires running the server with Java 21",
+      ]),
+      // view-distance 12 → 10; y con 5, el suelo de 4
+      caso("tick behind con vd 12", ["[12:00:00] [Server thread/WARN]: Can't keep up!"], 12, 8),
+      caso("tick behind con vd 5", ["[12:00:00] [Server thread/WARN]: Running 2345ms or 46 ticks behind"], 5, 4),
+      caso("tick behind con vd 2", ["[12:00:00] [Server thread/WARN]: Can't keep up!"], 2, 2),
+      // el nombre del plugin se recorta en el guion y el espacio
+      caso("plugin que revienta", ["[12:00:00] [Server thread/ERROR]: Error occurred while enabling LuckPerms-Bukkit v5.4 (Is it up to date?)"]),
+      // alternativas del patrón: las dos formas de PORT_IN_USE y las dos de TICK_BEHIND
+      caso("las alternativas del patrón", ["[12:00:00] [Server thread/ERROR]: Address already in use", "[12:00:00] [Server thread/WARN]: Running 5000ms or 100 ticks behind"]),
+      // una línea puede disparar dos reglas a la vez
+      caso("una línea, dos reglas", ["[12:00:00] [Server thread/ERROR]: OutOfMemoryError and Failed to bind to port"]),
+      // DATAPACK_FAIL: `(?:data )?` es opcional, así que las dos formas entran
+      caso("datapack sin la palabra data", ["[12:00:00] [Server thread/ERROR]: Failed to parse pack"]),
+      // WORLD_UPGRADE tiene dos alternativas y ninguna de las dos lleva fix
+      caso("data fixer", ["[12:00:00] [Server thread/WARN]: Data fixer for 1.20.4"]),
+    ],
+  };
+})();
+writeFileSync(join(golden, "doctor-log.json"), JSON.stringify(goldenDoctorLog, null, 2) + "\n", "utf8");
 
 console.log(
   `golden: ${Object.keys(sueltos).length} generadores de hoja + ${Object.keys(proyecto).length} ficheros de proyecto + catálogo + ${tiersGolden.casos.length} perfiles + ${rconGolden.casos.length} paquetes RCON + ${benchGolden.cpuScore.length} scores + ${modpackGolden.mrpack.length + modpackGolden.curseforge.length + modpackGolden.noModpack.length} casos de modpack + ${doctorGolden.scores.length} scores del doctor + ${goldenEngines.encode_uri_component.length + Object.values(goldenEngines).reduce((n, v) => n + (Array.isArray(v) ? v.length : 0), 0)} casos de engines`

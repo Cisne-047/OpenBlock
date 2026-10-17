@@ -69,6 +69,34 @@ export interface DoctorContext {
 
 // ---------- reglas sobre el log del boot ----------
 
+/**
+ * Evalúa las reglas de log sobre lo capturado (`runDoctor`, paso 3).
+ *
+ * Está separada de `runDoctor` para poder compararla con el port: es pura —texto
+ * de log y la config que leen las descripciones— y es donde vive el detalle que
+ * un puerto se salta: se usa **el primer match** de cada regla, no el último ni la
+ * suma, así que dos líneas que disparen `JAVA_VERSION` dan un hallazgo y el número
+ * de la primera.
+ *
+ * El `minCount` de `LogRule` está declarado y **no se usa**: una sola línea que
+ * case ya dispara el hallazgo. Se reproduce igual.
+ */
+export function evaluateLogRules(lines: string[], ctx: DoctorContext): Finding[] {
+  const out: Finding[] = [];
+  for (const rule of LOG_RULES) {
+    const matches = lines.map((l) => l.match(rule.pattern)).filter(Boolean) as RegExpMatchArray[];
+    if (matches.length === 0) continue;
+    out.push({
+      severity: rule.severity,
+      code: rule.code,
+      source: "log",
+      message: rule.message,
+      fix: rule.fix ? rule.fix(matches[0], ctx) : undefined,
+    });
+  }
+  return out;
+}
+
 export const LOG_RULES: LogRule[] = [
   {
     code: "JAVA_VERSION",
@@ -558,17 +586,7 @@ export async function runDoctor(
   }
 
   // 3) reglas de log sobre lo capturado
-  for (const rule of LOG_RULES) {
-    const matches = ctx.logLines.map((l) => l.match(rule.pattern)).filter(Boolean) as RegExpMatchArray[];
-    if (matches.length === 0) continue;
-    await collect({
-      severity: rule.severity,
-      code: rule.code,
-      source: "log",
-      message: rule.message,
-      fix: rule.fix ? rule.fix(matches[0], ctx) : undefined,
-    });
-  }
+  findings.push(...evaluateLogRules(ctx.logLines, ctx));
 
   // dedupe por código; el orden conserva estáticas primero
   const seen = new Set<string>();

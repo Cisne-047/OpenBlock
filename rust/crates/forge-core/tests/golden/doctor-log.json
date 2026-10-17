@@ -1,0 +1,236 @@
+{
+  "reglas": [
+    {
+      "code": "JAVA_VERSION",
+      "severity": "error",
+      "message": "Versión de Java incorrecta para esta versión de MC.",
+      "tiene_fix": true
+    },
+    {
+      "code": "EULA_NOT_ACCEPTED",
+      "severity": "error",
+      "message": "EULA sin aceptar: el server no arranca.",
+      "tiene_fix": true
+    },
+    {
+      "code": "PORT_IN_USE",
+      "severity": "error",
+      "message": "El puerto está ocupado por otro proceso.",
+      "tiene_fix": true
+    },
+    {
+      "code": "OOM",
+      "severity": "error",
+      "message": "La JVM se quedó sin memoria con la RAM asignada.",
+      "tiene_fix": true
+    },
+    {
+      "code": "PLUGIN_CRASH",
+      "severity": "error",
+      "message": "Un plugin revienta al cargar.",
+      "tiene_fix": true
+    },
+    {
+      "code": "TICK_BEHIND",
+      "severity": "warning",
+      "message": "El server no da los 20 TPS durante el arranque.",
+      "tiene_fix": true
+    },
+    {
+      "code": "WORLD_UPGRADE",
+      "severity": "warning",
+      "message": "El mundo se va a migrar a la nueva versión (proceso largo e irreversible).",
+      "tiene_fix": false
+    },
+    {
+      "code": "PLUGIN_API_OLD",
+      "severity": "info",
+      "message": "Un plugin fue compilado para una API más antigua; suele funcionar igual.",
+      "tiene_fix": false
+    },
+    {
+      "code": "DATAPACK_FAIL",
+      "severity": "error",
+      "message": "Un datapack del mundo está roto.",
+      "tiene_fix": false
+    }
+  ],
+  "casos": [
+    {
+      "nombre": "log vacío",
+      "args": [
+        {
+          "lineas": [],
+          "viewDistance": 8,
+          "simulationDistance": 6
+        }
+      ],
+      "salida_json": "[]",
+      "error": null
+    },
+    {
+      "nombre": "una línea que no casa",
+      "args": [
+        {
+          "lineas": [
+            "[12:00:00] [Server thread/INFO]: Done (3.2s)! For help, type \"help\""
+          ],
+          "viewDistance": 8,
+          "simulationDistance": 6
+        }
+      ],
+      "salida_json": "[]",
+      "error": null
+    },
+    {
+      "nombre": "todas disparan",
+      "args": [
+        {
+          "lineas": [
+            "[12:00:00] [main/ERROR]: requires running the server with Java 21",
+            "[12:00:00] [main/ERROR]: You need to agree to the EULA in order to run the server",
+            "[12:00:00] [Server thread/ERROR]: Failed to bind to port",
+            "[12:00:00] [Server thread/ERROR]: java.lang.OutOfMemoryError: Java heap space",
+            "[12:00:00] [Server thread/ERROR]: Error occurred while enabling EssentialsX v2.19.2 (Is it up to date?)",
+            "[12:00:00] [Server thread/WARN]: Can't keep up! Is the server overloaded?",
+            "[12:00:00] [Server thread/WARN]: Upgrading level /world to the new version",
+            "[12:00:00] [Server thread/INFO]: Unsupported API version 1.20",
+            "[12:00:00] [Server thread/ERROR]: Failed to load data pack file/world/datapacks/x.zip"
+          ],
+          "viewDistance": 8,
+          "simulationDistance": 6
+        }
+      ],
+      "salida_json": "[{\"severity\":\"error\",\"code\":\"JAVA_VERSION\",\"source\":\"log\",\"message\":\"Versión de Java incorrecta para esta versión de MC.\",\"fix\":{\"code\":\"install-java\",\"description\":\"Descargar Temurin JDK 21 y reescribir runtime/java.path\",\"considerable\":false}},{\"severity\":\"error\",\"code\":\"EULA_NOT_ACCEPTED\",\"source\":\"log\",\"message\":\"EULA sin aceptar: el server no arranca.\",\"fix\":{\"code\":\"accept-eula\",\"description\":\"Aceptar EULA (eula=true)\",\"considerable\":false}},{\"severity\":\"error\",\"code\":\"PORT_IN_USE\",\"source\":\"log\",\"message\":\"El puerto está ocupado por otro proceso.\",\"fix\":{\"code\":\"change-port\",\"description\":\"Cambiar el puerto a uno libre (server.properties + openblock.json)\",\"considerable\":true}},{\"severity\":\"error\",\"code\":\"OOM\",\"source\":\"log\",\"message\":\"La JVM se quedó sin memoria con la RAM asignada.\",\"fix\":{\"code\":\"raise-ram\",\"description\":\"Subir -Xmx un 50% (jvm-args.txt + user_jvm_args.txt)\",\"considerable\":true}},{\"severity\":\"error\",\"code\":\"PLUGIN_CRASH\",\"source\":\"log\",\"message\":\"Un plugin revienta al cargar.\",\"fix\":{\"code\":\"disable-plugin\",\"description\":\"Mover EssentialsX.jar a plugins_disabled/\",\"considerable\":true}},{\"severity\":\"warning\",\"code\":\"TICK_BEHIND\",\"source\":\"log\",\"message\":\"El server no da los 20 TPS durante el arranque.\",\"fix\":{\"code\":\"lower-vd\",\"description\":\"Bajar view-distance de 8 a 6 (gameplay visible)\",\"considerable\":true}},{\"severity\":\"warning\",\"code\":\"WORLD_UPGRADE\",\"source\":\"log\",\"message\":\"El mundo se va a migrar a la nueva versión (proceso largo e irreversible).\",\"fix\":null},{\"severity\":\"info\",\"code\":\"PLUGIN_API_OLD\",\"source\":\"log\",\"message\":\"Un plugin fue compilado para una API más antigua; suele funcionar igual.\",\"fix\":null},{\"severity\":\"error\",\"code\":\"DATAPACK_FAIL\",\"source\":\"log\",\"message\":\"Un datapack del mundo está roto.\",\"fix\":null}]",
+      "error": null
+    },
+    {
+      "nombre": "java: gana la primera línea",
+      "args": [
+        {
+          "lineas": [
+            "[12:00:00] [main/ERROR]: requires running the server with Java 17",
+            "[12:00:00] [main/ERROR]: requires running the server with Java 21"
+          ],
+          "viewDistance": 8,
+          "simulationDistance": 6
+        }
+      ],
+      "salida_json": "[{\"severity\":\"error\",\"code\":\"JAVA_VERSION\",\"source\":\"log\",\"message\":\"Versión de Java incorrecta para esta versión de MC.\",\"fix\":{\"code\":\"install-java\",\"description\":\"Descargar Temurin JDK 17 y reescribir runtime/java.path\",\"considerable\":false}}]",
+      "error": null
+    },
+    {
+      "nombre": "tick behind con vd 12",
+      "args": [
+        {
+          "lineas": [
+            "[12:00:00] [Server thread/WARN]: Can't keep up!"
+          ],
+          "viewDistance": 12,
+          "simulationDistance": 8
+        }
+      ],
+      "salida_json": "[{\"severity\":\"warning\",\"code\":\"TICK_BEHIND\",\"source\":\"log\",\"message\":\"El server no da los 20 TPS durante el arranque.\",\"fix\":{\"code\":\"lower-vd\",\"description\":\"Bajar view-distance de 12 a 10 (gameplay visible)\",\"considerable\":true}}]",
+      "error": null
+    },
+    {
+      "nombre": "tick behind con vd 5",
+      "args": [
+        {
+          "lineas": [
+            "[12:00:00] [Server thread/WARN]: Running 2345ms or 46 ticks behind"
+          ],
+          "viewDistance": 5,
+          "simulationDistance": 4
+        }
+      ],
+      "salida_json": "[{\"severity\":\"warning\",\"code\":\"TICK_BEHIND\",\"source\":\"log\",\"message\":\"El server no da los 20 TPS durante el arranque.\",\"fix\":{\"code\":\"lower-vd\",\"description\":\"Bajar view-distance de 5 a 4 (gameplay visible)\",\"considerable\":true}}]",
+      "error": null
+    },
+    {
+      "nombre": "tick behind con vd 2",
+      "args": [
+        {
+          "lineas": [
+            "[12:00:00] [Server thread/WARN]: Can't keep up!"
+          ],
+          "viewDistance": 2,
+          "simulationDistance": 2
+        }
+      ],
+      "salida_json": "[{\"severity\":\"warning\",\"code\":\"TICK_BEHIND\",\"source\":\"log\",\"message\":\"El server no da los 20 TPS durante el arranque.\",\"fix\":{\"code\":\"lower-vd\",\"description\":\"Bajar view-distance de 2 a 4 (gameplay visible)\",\"considerable\":true}}]",
+      "error": null
+    },
+    {
+      "nombre": "plugin que revienta",
+      "args": [
+        {
+          "lineas": [
+            "[12:00:00] [Server thread/ERROR]: Error occurred while enabling LuckPerms-Bukkit v5.4 (Is it up to date?)"
+          ],
+          "viewDistance": 8,
+          "simulationDistance": 6
+        }
+      ],
+      "salida_json": "[{\"severity\":\"error\",\"code\":\"PLUGIN_CRASH\",\"source\":\"log\",\"message\":\"Un plugin revienta al cargar.\",\"fix\":{\"code\":\"disable-plugin\",\"description\":\"Mover LuckPerms-Bukkit.jar a plugins_disabled/\",\"considerable\":true}}]",
+      "error": null
+    },
+    {
+      "nombre": "las alternativas del patrón",
+      "args": [
+        {
+          "lineas": [
+            "[12:00:00] [Server thread/ERROR]: Address already in use",
+            "[12:00:00] [Server thread/WARN]: Running 5000ms or 100 ticks behind"
+          ],
+          "viewDistance": 8,
+          "simulationDistance": 6
+        }
+      ],
+      "salida_json": "[{\"severity\":\"error\",\"code\":\"PORT_IN_USE\",\"source\":\"log\",\"message\":\"El puerto está ocupado por otro proceso.\",\"fix\":{\"code\":\"change-port\",\"description\":\"Cambiar el puerto a uno libre (server.properties + openblock.json)\",\"considerable\":true}},{\"severity\":\"warning\",\"code\":\"TICK_BEHIND\",\"source\":\"log\",\"message\":\"El server no da los 20 TPS durante el arranque.\",\"fix\":{\"code\":\"lower-vd\",\"description\":\"Bajar view-distance de 8 a 6 (gameplay visible)\",\"considerable\":true}}]",
+      "error": null
+    },
+    {
+      "nombre": "una línea, dos reglas",
+      "args": [
+        {
+          "lineas": [
+            "[12:00:00] [Server thread/ERROR]: OutOfMemoryError and Failed to bind to port"
+          ],
+          "viewDistance": 8,
+          "simulationDistance": 6
+        }
+      ],
+      "salida_json": "[{\"severity\":\"error\",\"code\":\"PORT_IN_USE\",\"source\":\"log\",\"message\":\"El puerto está ocupado por otro proceso.\",\"fix\":{\"code\":\"change-port\",\"description\":\"Cambiar el puerto a uno libre (server.properties + openblock.json)\",\"considerable\":true}},{\"severity\":\"error\",\"code\":\"OOM\",\"source\":\"log\",\"message\":\"La JVM se quedó sin memoria con la RAM asignada.\",\"fix\":{\"code\":\"raise-ram\",\"description\":\"Subir -Xmx un 50% (jvm-args.txt + user_jvm_args.txt)\",\"considerable\":true}}]",
+      "error": null
+    },
+    {
+      "nombre": "datapack sin la palabra data",
+      "args": [
+        {
+          "lineas": [
+            "[12:00:00] [Server thread/ERROR]: Failed to parse pack"
+          ],
+          "viewDistance": 8,
+          "simulationDistance": 6
+        }
+      ],
+      "salida_json": "[{\"severity\":\"error\",\"code\":\"DATAPACK_FAIL\",\"source\":\"log\",\"message\":\"Un datapack del mundo está roto.\",\"fix\":null}]",
+      "error": null
+    },
+    {
+      "nombre": "data fixer",
+      "args": [
+        {
+          "lineas": [
+            "[12:00:00] [Server thread/WARN]: Data fixer for 1.20.4"
+          ],
+          "viewDistance": 8,
+          "simulationDistance": 6
+        }
+      ],
+      "salida_json": "[{\"severity\":\"warning\",\"code\":\"WORLD_UPGRADE\",\"source\":\"log\",\"message\":\"El mundo se va a migrar a la nueva versión (proceso largo e irreversible).\",\"fix\":null}]",
+      "error": null
+    }
+  ]
+}
