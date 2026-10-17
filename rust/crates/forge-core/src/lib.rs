@@ -22,9 +22,11 @@
 //! - [ ] `hw` — detección de hardware y tiers
 //! - [ ] `plan` y `api` — resolución de descargas contra las APIs
 
+pub mod catalog;
 pub mod generators;
 pub mod types;
 
+pub use catalog::LoaderKind;
 pub use types::{EngineId, PerfProfile, ServerConfig, TargetOs};
 
 /// Mapa de ficheros generados: ruta relativa → contenido.

@@ -18,6 +18,7 @@ import { jvmArgsLine } from "../src/generators/jvm.js";
 import { bukkitYml, paperGlobalYml, paperWorldDefaultsYml, spigotYml } from "../src/generators/paper.js";
 import { backupPs1, backupSh, backupTimer, firewallPs1, firewallSh } from "../src/generators/ops.js";
 import { installServicePs1, installServiceSh, removeServicePs1, systemdUnit, winswConfig } from "../src/generators/service.js";
+import { ENGINES, PERF_ITEMS, javaMajorFor, parseMc, perfItemsFor } from "../src/catalog.js";
 import { planFor } from "./helpers.js";
 import type { ServerConfig } from "../src/types.js";
 
@@ -63,5 +64,68 @@ for (const [nombre, contenido] of Object.entries(proyecto)) {
   writeFileSync(join(golden, "project", nombre), contenido, "utf8");
 }
 
-console.log(`golden: ${Object.keys(sueltos).length} generadores de hoja + ${Object.keys(proyecto).length} ficheros de proyecto`);
+// Catálogo: las tablas enteras, no solo el comportamiento. Aquí es donde se cuela
+// una errata en una `desc` o un `reason` que ningún test de comportamiento ve.
+const catalogo = {
+  engines: ENGINES.map((e) => ({
+    id: e.id,
+    label: e.label,
+    loader: e.loader,
+    desc: e.desc,
+    pluginApi: e.pluginApi,
+    modApi: e.modApi,
+    multithread: e.multithread,
+    installer: e.installer,
+    modpackLoader: e.modpackLoader,
+  })),
+  perfItems: PERF_ITEMS.map((p) => ({
+    id: p.id,
+    label: p.label,
+    kind: p.kind,
+    loaders: p.loaders,
+    minMc: p.minMc,
+    maxMc: p.maxMc,
+    slug: p.slug,
+    reason: p.reason,
+    default: p.default,
+  })),
+  // resolución por loader×versión, que es lo que consume el plan
+  perfPorLoader: Object.fromEntries(
+    ["none", "paper", "fabric", "quilt", "forge", "neoforge"].map((l) => [
+      l,
+      ["1.16.5", "1.18.2", "1.19.4", "1.20.1", "1.20.4", "1.21.4"].map((mc) => ({
+        mc,
+        ids: perfItemsFor(l as never, mc).map((i) => i.id),
+      })),
+    ])
+  ),
+  // mapa Java/MC, incluidos los bordes
+  javaPorMc: Object.fromEntries(
+    ["1.12.2", "1.16.5", "1.17", "1.17.1", "1.18.2", "1.20.4", "1.20.5", "1.20.6", "1.21.4", "26.1", "26.3", "26w14a"].map((mc) => [
+      mc,
+      javaMajorFor(mc),
+    ])
+  ),
+  parseMc: Object.fromEntries(
+    [
+      "1.21.4",
+      "1.20",
+      "26.3",
+      "26w14a",
+      "1.2b.3",
+      "1.20.b",
+      "1.20.4-rc1",
+      "1.",
+      ".5",
+      "1.2.",
+      "1.2.3.4",
+      "10.20.30",
+      "basura",
+      "",
+    ].map((v) => [v, parseMc(v)])
+  ),
+};
+writeFileSync(join(golden, "catalog.json"), JSON.stringify(catalogo, null, 2) + "\n", "utf8");
+
+console.log(`golden: ${Object.keys(sueltos).length} generadores de hoja + ${Object.keys(proyecto).length} ficheros de proyecto + catálogo`);
 console.log(`en ${golden}`);

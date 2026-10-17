@@ -27,7 +27,7 @@ vigila al otro lado.
 | `generators::paper` | portado |
 | `generators::ops` | portado |
 | `generators::service` | portado |
-| `catalog` | pendiente |
+| `catalog` | portado |
 | `generators::scripts` | pendiente |
 | `generators` (raíz, `generateProject`) | pendiente |
 | `hw` (detección y tiers) | pendiente |
@@ -72,6 +72,13 @@ Deliberadas y anotadas, como la lista que DistroForge mantiene en su
 3. **`diskMBs` y `ramMB` llevan `#[serde(rename)]` explícito.** El `camelCase` de
    serde convierte `disk_m_bs` en `diskMbS`, que no es lo que dice el JSON del TS:
    serde no adivina acrónimos, así que se declaran a mano.
+4. **`parseMc` está escrito a mano, sin regex.** Traer una librería de expresiones
+   regulares a un núcleo que quiere ser portable a wasm no compensa por un patrón
+   de tres grupos, así que la lógica está reimplementada. La paridad se comprueba
+   con 13 casos límite generados por el TS (`1.2b.3`, `1.20.b`, `1.2.`, `1.2.3.4`,
+   `26w14a`, `10.20.30`…), **no** con razonamiento: mis tres primeras lecturas del
+   regex eran falsas y el golden las cazó una a una. Si algún día aparece una
+   entrada rara, el sitio para añadirla es `tests/parity-golden.ts`.
 
 ## Por qué Rust
 
