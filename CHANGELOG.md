@@ -2,9 +2,9 @@
 
 Las etiquetas del repositorio siguen `vX.Y.Z`. La v0.1.0 cierra el trabajo acumulado desde el primer commit: OpenBlock instala, arranca y diagnostica servers de Minecraft.
 
-OpenBlock es el hermano de [DistroForge](https://github.com/cisne-047/DistroForge) (que forja distros Linux): comparten arquitectura —config declarativa, generadores puros que producen un `FileMap`, round-trip del proyecto y suite vitest— pero **no comparten código**. Aquí se registra solo lo que cambia en OpenBlock.
+OpenBlock es el hermano de [DistroForge](https://github.com/cisne-047/DistroForge) (que forja distros Linux): comparten arquitectura —config declarativa, generadores puros que producen un `FileMap`, round-trip del proyecto y suite vitest— pero **no comparten código**. Aquí se registra solo lo que cambia en OpenBlock, que sigue en **TypeScript**: el port a Rust es un hito pendiente, no algo empezado.
 
-## v0.1.0 (sin publicar)
+## v0.1.0 (publicada en npm el 17/10/2026)
 
 ### Añadido
 
@@ -51,7 +51,7 @@ OpenBlock es el hermano de [DistroForge](https://github.com/cisne-047/DistroForg
 
 - **Port a Rust**: el hito compartido con DistroForge. DistroForge **ya lo completó** (`rust/crates/forge-core`, 77 tests espejo de los 74 del TS): la paridad no la sostiene un fichero de versión sino serialización byte-estable, suite espejo y un `diff -r` documentado. OpenBlock sigue en TypeScript y va preparando el terreno: núcleo puro, generadores deterministas y `doctor --json` como contrato (ahora sí, de solo lectura).
 - **El modo avanzado sigue con `strict: false`**: los flags desconocidos se ignoran ahí (el resto de la CLI ya falla con mensaje y lista las opciones válidas). Unificarlo pide decidir antes si `--motd`, `--seed` y compañía entran como flags de primera.
-- **Decidir si se publica en npm**: el paquete ya está listo y verificado (`npm pack` → 80 kB, instala y funciona), y el nombre `openblock` está libre en el registro (comprobado). Publicar es un `npm publish` y asumir que cualquiera podrá instalarlo sin acceso al repo privado.
+- **Publicado**: `openblock@0.1.0` está en el registro de npm desde el 17/10/2026 y se instala con `npm install -g openblock`. Verificado desde el registro (no solo desde el tarball local): 14 paquetes, el comando queda en el PATH, genera proyecto y zip, y su `self-test` arranca un Paper real. La publicación necesitó un paso manual de autenticación en dos pasos que npm exige y que ningún token puede saltarse — que es exactamente para lo que está.
 - **El self-test cubre un solo engine y una sola versión**: Paper 1.20.4 por defecto (Java 17) y Java 21 en CI. No arranca Fabric, Forge ni Folia, que son caminos distintos (`run.sh` del installer, `user_jvm_args.txt`). El self-test acota el hueco de CI, no lo cierra del todo.
 - **Los avisos del plan no son fallo**: al instalar se ve `[plan] spark: sin build para 1.20.4`. Es correcto (ese plugin no publica para esa versión y se salta), pero el self-test no lo distingue de un fallo real si algún día deja de ser intencionado.
 
