@@ -5,6 +5,7 @@ import { latestRelease } from "./api/mojang";
 import { applyConfig, ensureRconPassword, runBackup, stopServer } from "./apply";
 import { detectHardware } from "./hw/detect";
 import { classifyHardware, recommendedRamMB } from "./hw/tiers";
+import { HELP } from "./help";
 import type { EngineId, PerfProfile, ServerConfig } from "./types";
 import { c, confirm, kvTable } from "./ui";
 
@@ -42,6 +43,8 @@ export interface AdvancedArgs {
   yes?: boolean;
   force?: boolean;
   noPregen?: boolean;
+  /** pide la ayuda en vez de construir la config */
+  help?: boolean;
 }
 
 export function parseAdvancedArgs(argv: string[]): AdvancedArgs {
@@ -73,6 +76,7 @@ export function parseAdvancedArgs(argv: string[]): AdvancedArgs {
       "dry-run": { type: "boolean" },
       yes: { type: "boolean" },
       force: { type: "boolean" },
+      help: { type: "boolean" },
     },
     strict: false,
   });
@@ -102,6 +106,7 @@ export function parseAdvancedArgs(argv: string[]): AdvancedArgs {
     dryRun: !!values["dry-run"],
     yes: !!values.yes,
     force: !!values.force,
+    help: !!values.help,
   };
 }
 
@@ -176,6 +181,10 @@ export async function buildAdvancedConfig(a: AdvancedArgs): Promise<ServerConfig
 
 export async function advanced(argv: string[]): Promise<void> {
   const a = parseAdvancedArgs(argv);
+  if (a.help) {
+    console.log(HELP);
+    return;
+  }
   const cfg = await buildAdvancedConfig(a);
   const hw = await detectHardware();
   console.log(c.bold("\n== Config avanzada =="));

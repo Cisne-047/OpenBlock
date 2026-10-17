@@ -406,11 +406,26 @@ async function patchProperties(dir: string, patch: Record<string, string>): Prom
   await writeFile(p, txt, "utf8");
 }
 
+/**
+ * Reescribe el heap en un fichero de flags JVM.
+ *
+ * `-Xms` y `-Xmx` van por separado y en ese orden. Antes había un solo
+ * `/-Xm[sx]\d+[MG]/g` que sustituía por `-Xmx` y por tanto **también reescribía
+ * `-Xms`**, dejando muerto el `replace` siguiente y rompiendo en silencio el heap
+ * simétrico que genera `aikarFlags` (`-Xms` igual a `-Xmx`: evita que la JVM
+ * redimensione el heap en caliente). Solo toca las flags que ya existen, que es
+ * lo que pide el fix: subir la RAM asignada, no inventar flags.
+ *
+ * Es puro a propósito, para poder comprobarlo sin arrancar un server.
+ */
+export function rewriteHeapFlags(txt: string, ramMB: number): string {
+  return txt.replace(/-Xms\d+[MG]/g, `-Xms${ramMB}M`).replace(/-Xmx\d+[MG]/g, `-Xmx${ramMB}M`);
+}
+
 async function patchRam(dir: string, ramMB: number): Promise<void> {
-  const swapX = (txt: string) => txt.replace(/-Xm[sx]\d+[MG]/g, `-Xmx${ramMB}M`).replace(/-Xms\d+[MG]/g, `-Xms${ramMB}M`);
   for (const f of ["jvm-args.txt", "user_jvm_args.txt"]) {
     const p = join(dir, f);
-    if (existsSync(p)) await writeFile(p, swapX(await readFile(p, "utf8")), "utf8");
+    if (existsSync(p)) await writeFile(p, rewriteHeapFlags(await readFile(p, "utf8"), ramMB), "utf8");
   }
 }
 
@@ -490,7 +505,25 @@ async function bootTest(cfg: ServerConfig, dir: string, capture: (line: string) 
 
 // ---------- orquestación ----------
 
-export async function runDoctor(cfg: ServerConfig, opts: { boot?: boolean; interactive?: boolean } = {}): Promise<DoctorReport> {
+/**
+ * Diagnóstico del server.
+ *
+ * `readOnly` no toca nada: ni ficheros, ni plugins, ni RCON. Sin él, este
+ * comando reescribía `eula.txt` y `server.properties` y reinstalaba plugins
+ * incluso con `--json`, mientras el README vendía ese JSON como el contrato de
+ * verificación del port a Rust. Un contrato que muta el server que inspecciona no
+ * sirve para comparar dos implementaciones. El CLI lo activa siempre que no haya
+ * terminal interactiva (`--json`, `--yes`, tubería o CI), y el modo interactivo
+ * es el único que puede arreglar cosas.
+ *
+ * En readOnly el score refleja el estado real, sin fixes: si falta el EULA, el
+ * diagnóstico lo dice y resta, en vez de arreglarlo y puntuar después un server
+ * que ya no es el que se inspeccionó.
+ */
+export async function runDoctor(
+  cfg: ServerConfig,
+  opts: { boot?: boolean; interactive?: boolean; readOnly?: boolean } = {}
+): Promise<DoctorReport> {
   const dir = resolve(cfg.serverDir);
   const ctx: DoctorContext = { cfg, dir, logLines: [], bootTested: false, bootOk: false };
   const findings: Finding[] = [];
@@ -510,10 +543,11 @@ export async function runDoctor(cfg: ServerConfig, opts: { boot?: boolean; inter
     }
   };
 
-  // 1) estáticas pre-boot + fixes seguros YA (que el boot test arranque limpio)
+  // 1) estáticas pre-boot + fixes seguros YA (que el boot test arranque limpio).
+  // En readOnly no se aplica nada: el diagnóstico solo informa.
   for (const rule of STATIC_RULES) await collect(await rule.check(ctx));
   const safeStatic = findings.filter((f) => f.fix && !f.fix.considerable);
-  if (safeStatic.length) await applySafe(safeStatic);
+  if (safeStatic.length && !opts.readOnly) await applySafe(safeStatic);
 
   // 2) boot test (dry run real)
   if (opts.boot) {
@@ -540,10 +574,15 @@ export async function runDoctor(cfg: ServerConfig, opts: { boot?: boolean; inter
   const seen = new Set<string>();
   const all = findings.filter((f) => (seen.has(f.code) ? false : (seen.add(f.code), true)));
 
-  // aplicar fixes: seguros al instante, considerables con confirmación
+  // aplicar fixes: seguros al instante, considerables con confirmación.
+  // En readOnly no se escribe nada: los seguros que se habrían aplicado solos se
+  // listan como pendientes, para que el informe diga qué se puede arreglar sin
+  // que el score mienta sobre el estado inspeccionado.
   for (const f of all) {
     if (!f.fix || applied.includes(f.fix.code)) continue;
-    if (!f.fix.considerable) {
+    if (opts.readOnly) {
+      pending.push(f.fix.considerable ? f.fix.description : `${f.fix.description} (automático)`);
+    } else if (!f.fix.considerable) {
       console.log(c.cyan(`  ⚙ ${f.fix.description}...`));
       await f.fix.apply();
       applied.push(f.fix.code);

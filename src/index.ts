@@ -1,46 +1,16 @@
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { advanced, backupCommand, buildAdvancedConfig, parseAdvancedArgs, stopCommand } from "./advanced";
+import { dirFrom, parseFlags } from "./cli";
 import { runBenchmark } from "./hw/bench";
 import { detectHardware } from "./hw/detect";
 import { classifyHardware, recommendedRamMB } from "./hw/tiers";
 import { generateProject } from "./generators";
 import { writeProject, zipProject } from "./output";
 import { guided } from "./guided";
+import { HELP } from "./help";
 import type { ServerConfig } from "./types";
 import { c, kvTable, banner } from "./ui";
-
-const HELP = `
-OpenBlock — forja servidores de Minecraft según tu hardware (Windows/Linux)
-
-  openblock                      Modo guiado (wizard)
-  openblock guided               Igual
-  openblock advanced [...]       Modo avanzado por flags
-      --config openblock.json    base de config reimportable (round-trip)
-      --mc 1.21.4 --engine paper|purpur|folia|fabric|quilt|forge|neoforge|vanilla
-      --ram-mb 8192 --players 20 --port 25565 --vd 8 --sd 6
-      --profile conservative|balanced|aggressive --pregen 4000
-      --modpack <url-mrpack> --dir ./server --target linux|windows|both
-      --no-service --no-backup --no-rcon --no-pregen
-      --dry-run --yes --force
-  openblock detect               Hardware + tier + recomendación
-  openblock bench [--detect]     Benchmark CPU/disco (~5s)
-  openblock generate [...]       Solo genera el proyecto (sin instalar); --zip out.zip
-  openblock install [...]        advanced con apply (alias)
-  openblock doctor [--dir X]     Mini-IA: dry run del server, errores/warnings,
-                                 fixes automáticos, pregunta lo considerable
-      --no-boot                  análisis estático sin arrancar
-      --yes                      no preguntar (aplica solo lo seguro)
-      --json                     reporte JSON (para scripts/port Rust)
-  openblock info --dir ./server  Config del server instalado
-  openblock backup --dir ./server   Ejecuta backup.sh/.ps1 ahora
-  openblock stop --dir ./server  Apaga por RCON
-
-Advanced extras: --build N (paper/purpur/folia/forge/neoforge), --loader-build N,
-  --installer-build N (fabric/quilt), --custom url1,ruta2 (plugins/mods propios)
-
-Project format: openblock.json round-trip, como DistroForge.
-`;
 
 async function detectCmd(withBench: boolean): Promise<void> {
   const hw = await detectHardware();
@@ -67,11 +37,25 @@ async function detectCmd(withBench: boolean): Promise<void> {
   if (process.argv.includes("--json")) console.log(JSON.stringify(hw, null, 2));
 }
 
+/**
+ * Reconstruye los flags ya normalizados para `parseAdvancedArgs`.
+ * `generate` comparte el parser con el resto de comandos (y gana su validación),
+ * pero el modo avanzado necesita volver a ver sus propias flags: si se las
+ * quedara el parser, `--dir` o `--yes` se perderían por el camino.
+ */
+function toArgv(values: Record<string, string | boolean>): string[] {
+  const out: string[] = [];
+  for (const [k, v] of Object.entries(values)) out.push(`--${k}`, ...(v === true ? [] : [String(v)]));
+  return out;
+}
+
 async function generateCmd(argv: string[]): Promise<void> {
-  const zipIdx = argv.indexOf("--zip");
-  const zipOut = zipIdx >= 0 ? argv[zipIdx + 1] : undefined;
-  const rest = argv.filter((_x, i) => !(zipIdx >= 0 && (i === zipIdx || i === zipIdx + 1)));
-  const a = parseAdvancedArgs(rest);
+  const { values } = parseFlags(argv, {
+    strings: ["zip", "dir", "name", "mc", "engine", "ram-mb", "players", "port", "vd", "sd", "profile", "pregen", "modpack", "build", "loader-build", "installer-build", "custom", "target", "config"],
+    booleans: ["yes", "force", "dry-run", "no-service", "no-backup", "no-rcon", "no-pregen"],
+  });
+  const zipOut = typeof values.zip === "string" ? values.zip : undefined;
+  const a = parseAdvancedArgs(toArgv(values));
   const cfg = await buildAdvancedConfig(a);
   const hw = await detectHardware();
   const { buildDownloadPlan } = await import("./plan");
@@ -109,21 +93,28 @@ async function infoCmd(dir: string): Promise<void> {
 
 async function doctorCmd(rest: string[]): Promise<void> {
   const { runDoctor, printReport } = await import("./doctor");
-  const dirIdx = rest.indexOf("--dir");
-  const dirArg = dirIdx >= 0 ? rest[dirIdx + 1] : ".";
+  const { values } = parseFlags(rest, {
+    strings: ["dir"],
+    booleans: ["json", "yes", "no-boot"],
+  });
+  const dirArg = typeof values.dir === "string" ? values.dir : ".";
   const p = resolve(dirArg, "openblock.json");
   if (!existsSync(p)) throw new Error(`No existe ${p}: instala el server primero`);
   const cfg = JSON.parse(readFileSync(p, "utf8")) as ServerConfig;
   // serverDir embebido puede ser de otro SO (zip generado en Windows, corrido en
   // Linux o WSL): si no existe aquí, el doctor opera sobre --dir
   if (!existsSync(cfg.serverDir)) cfg.serverDir = resolve(dirArg);
-  const json = rest.includes("--json");
-  const yes = rest.includes("--yes");
-  const boot = !rest.includes("--no-boot");
+  const json = values.json === true;
+  const yes = values.yes === true;
+  const boot = values["no-boot"] !== true;
+  const interactive = !json && !yes && process.stdout.isTTY === true;
   console.log(c.bold(`\n== Doctor: ${cfg.name} (${cfg.engine} ${cfg.mcVersion}) ==`));
   const report = await runDoctor(cfg, {
     boot,
-    interactive: !json && !yes && process.stdout.isTTY === true,
+    interactive,
+    // Solo el modo interactivo escribe. `--json` (y una tubería o CI) informan y
+    // no tocan nada: el JSON es el contrato que verifica el port a Rust.
+    readOnly: !interactive,
   });
   if (json) {
     console.log(
@@ -148,17 +139,22 @@ async function doctorCmd(rest: string[]): Promise<void> {
 async function main(): Promise<void> {
   banner();
   const argv = process.argv.slice(2);
-  const cmd = argv[0] && !argv[0].startsWith("-") ? argv[0] : "guided";
-  const rest = cmd === "guided" ? argv.slice(1) : argv.slice(1);
+  // Sin subcomando (o directamente con flags) se va al modo avanzado con TODOS
+  // los argumentos. Antes el ternario tenía las dos ramas iguales y descartaba
+  // argv[0], así que `openblock --engine paper --yes` abría el wizard sin engine.
+  const first = argv[0];
+  // Sin subcomando, TODOS los argumentos son del modo avanzado: `argv[0]` ya es
+  // una flag, así que no hay nada que recortar. Con subcomando sí se recorta.
+  if (first === undefined || first.startsWith("-")) {
+    if (first === "--help" || first === "-h") console.log(HELP);
+    else await advanced(argv);
+    return;
+  }
+  const cmd = first;
+  const rest = argv.slice(1);
   switch (cmd) {
     case "guided":
-    case undefined:
-      if (rest.length) {
-        // guided no acepta flags: cae a advanced si hay
-        await advanced(rest);
-      } else {
-        await guided();
-      }
+      await guided();
       break;
     case "advanced":
     case "install":
@@ -173,21 +169,15 @@ async function main(): Promise<void> {
     case "generate":
       await generateCmd(rest);
       break;
-    case "info": {
-      const dir = rest[rest.indexOf("--dir") + 1] ?? ".";
-      await infoCmd(dir);
+    case "info":
+      await infoCmd(dirFrom(rest));
       break;
-    }
-    case "backup": {
-      const dir = rest[rest.indexOf("--dir") + 1] ?? ".";
-      await backupCommand(dir);
+    case "backup":
+      await backupCommand(dirFrom(rest));
       break;
-    }
-    case "stop": {
-      const dir = rest[rest.indexOf("--dir") + 1] ?? ".";
-      await stopCommand(dir);
+    case "stop":
+      await stopCommand(dirFrom(rest));
       break;
-    }
     case "doctor": {
       await doctorCmd(rest);
       break;

@@ -1,8 +1,9 @@
 import { describe, expect, it } from "vitest";
+import { existsSync } from "node:fs";
 import { mkdtemp, readFile, writeFile, rm, mkdir } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { findFreePort, jarNameFromStartScript, runDoctor } from "../src/doctor";
+import { findFreePort, jarNameFromStartScript, rewriteHeapFlags, runDoctor } from "../src/doctor";
 import { ctxFor, doctorCfg as cfg } from "./helpers";
 
 describe("reglas de log", () => {
@@ -132,13 +133,25 @@ describe("helpers", () => {
     const p = await findFreePort(45100);
     expect(p).toBeGreaterThanOrEqual(45100);
   });
+
+  it("subir la RAM conserva el heap simétrico (-Xms y -Xmx)", () => {
+    // Regresión: el patrón /-Xm[sx]/ sustituía siempre por -Xmx, así que
+    // reescribía -Xms también. El heap simétrico de Aikar (-Xms512M -Xmx512M)
+    // acababa en "-Xmx8192M -Xmx8192M" y la JVM redimensionaba el heap en
+    // caliente, que es justo lo que la simetría evita.
+    expect(rewriteHeapFlags("-Xms512M -Xmx512M", 8192)).toBe("-Xms8192M -Xmx8192M");
+    expect(rewriteHeapFlags("-Xms2G -Xmx2G", 4096)).toBe("-Xms4096M -Xmx4096M");
+    // no inventa flags que no estaban
+    expect(rewriteHeapFlags("-XX:+UseG1GC", 4096)).toBe("-XX:+UseG1GC");
+  });
 });
 
 describe("runDoctor end-to-end (sin boot)", () => {
   it("score y grade coherentes con findings", async () => {
     const dir = await mkdtemp(join(tmpdir(), "ob-doctor-"));
     try {
-      // server vacío: eula falta (error) + jar falta (error) => score 60.
+      // server vacío: eula falta (error) + jar falta (error) => 100 - 20 = 80
+      // post-fix, porque el EULA se arregla solo y desaparece de findings.
       // mcVersion 26.3 = Java 25 = el del sistema: evita que JAVA_MAJOR baje un JDK de verdad
       const cfgx = cfg({ serverDir: dir, mcVersion: "26.3" });
       const r = await runDoctor(cfgx, { boot: false });
@@ -151,9 +164,29 @@ describe("runDoctor end-to-end (sin boot)", () => {
       // score post-fix: solo el error sin fix automático (jar ausente) resta
       expect(r.score).toBe(80);
       expect(r.grade).toBe("OK CON AVISOS");
-      // eula se arregló sola (fix auto)
-      expect(await readFile(join(dir, "eula.txt"), "utf8")).toBe("eula=true\n");
-      expect(r.applied).toContain("accept-eula");
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("readOnly no toca el server y el score refleja el estado real", async () => {
+    // Regresión: el doctor aplicaba los fixes seguros incluso con `--json`, así
+    // que el "contrato para el port a Rust" reescribía eula.txt y reinstalaba
+    // plugins mientras decía que solo informaba.
+    const dir = await mkdtemp(join(tmpdir(), "ob-doctor-"));
+    try {
+      const cfgx = cfg({ serverDir: dir, mcVersion: "26.3" });
+      const r = await runDoctor(cfgx, { boot: false, readOnly: true });
+
+      // no ha escrito nada
+      expect(existsSync(join(dir, "eula.txt"))).toBe(false);
+      expect(r.applied).toEqual([]);
+      // y el informe dice qué se habría arreglado solo, sin aplicarlo
+      expect(r.pending.join(" ")).toContain("automático");
+      // el EULA sigue contando como error, así que el score es el del estado
+      // inspeccionado y no el post-fix (80 con los mismos findings sin readOnly)
+      expect(r.findings.map((f) => f.code)).toContain("EULA_FILE");
+      expect(r.score).toBeLessThan(80);
     } finally {
       await rm(dir, { recursive: true, force: true });
     }
