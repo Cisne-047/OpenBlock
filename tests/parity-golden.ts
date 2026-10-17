@@ -313,24 +313,30 @@ const CF_VALIDO = JSON.stringify({
 
 const modpackGolden = {
   mrpack: [
-    { nombre: "válido del TS", json: MRPACK_VALIDO, ok: true },
-    { nombre: "formatVersion 2", json: JSON.stringify({ formatVersion: 2, versionId: "x" }), ok: false },
-    { nombre: "formatVersion ausente", json: JSON.stringify({ versionId: "x" }), ok: false },
-    { nombre: "json roto", json: "{ no es json }", ok: false },
-    { nombre: "sin ficheros", json: JSON.stringify({ formatVersion: 1, versionId: "x" }), ok: true },
-  ].map(({ nombre, json, ok }) => {
+    { nombre: "válido del TS", json: MRPACK_VALIDO },
+    { nombre: "formatVersion 2", json: JSON.stringify({ formatVersion: 2, versionId: "x" }) },
+    { nombre: "formatVersion ausente", json: JSON.stringify({ versionId: "x" }) },
+    { nombre: "json roto", json: "{ no es json }" },
+    { nombre: "sin ficheros", json: JSON.stringify({ formatVersion: 1, versionId: "x" }) },
+  ].map(({ nombre, json }) => {
     // Las dos llamadas se registran por separado: en el TS, `parseMrpackIndex`
     // puede pasar y `mrpackServerFiles` reventar después (si falta `files`),
     // porque no comprueba nada. Mezclarlas ocultaría esa diferencia.
+    //
+    // Y **no** se guarda el mensaje de error: el de `JSON.parse` cambia entre
+    // versiones de Node ("...at position 2" vs "...at position 2 (line 1 column
+    // 3)"), así que meterlo aquí haría el golden irreproducible —lo cazó la
+    // compuerta de "el golden está al día"— y Rust nunca lo va a reproducir de
+    // todas formas. Se guarda que falló, que es lo comparable.
     try {
       const idx = parseMrpackIndex(json);
       try {
-        return { nombre, parseOk: true, serverOk: true, formato: idx.formatVersion, dependencias: idx.dependencies, servidor: mrpackServerFiles(idx).map((f) => f.path), parseError: null as string | null, serverError: null as string | null };
-      } catch (e) {
-        return { nombre, parseOk: true, serverOk: false, formato: idx.formatVersion, dependencias: idx.dependencies, servidor: [] as string[], parseError: null as string | null, serverError: (e as Error).message };
+        return { nombre, parseOk: true, serverOk: true, formato: idx.formatVersion, dependencias: idx.dependencies, servidor: mrpackServerFiles(idx).map((f) => f.path) };
+      } catch {
+        return { nombre, parseOk: true, serverOk: false, formato: idx.formatVersion, dependencias: idx.dependencies, servidor: [] as string[] };
       }
-    } catch (e) {
-      return { nombre, parseOk: ok && false, serverOk: false, formato: 0, dependencias: {}, servidor: [] as string[], parseError: (e as Error).message, serverError: null as string | null };
+    } catch {
+      return { nombre, parseOk: false, serverOk: false, formato: 0, dependencias: {}, servidor: [] as string[] };
     }
   }),
   curseforge: [
@@ -346,7 +352,7 @@ const modpackGolden = {
       const k = cfLoaderKind(m);
       return { nombre, ok: true, engine: k?.engine ?? null, build: k?.build ?? null, mc: m.minecraft.version, ficheros: m.files.length };
     } catch (e) {
-      return { nombre, ok: false, error: (e as Error).message, engine: null, build: null, mc: "", ficheros: 0 };
+      return { nombre, ok: false, engine: null, build: null, mc: "", ficheros: 0 };
     }
   }),
   // un manifest que no es de modpack: el TS lo rechaza con mensaje propio
@@ -358,7 +364,7 @@ const modpackGolden = {
       parseCfManifest(json);
       return { nombre, ok: true, error: null as string | null };
     } catch (e) {
-      return { nombre, ok: false, error: (e as Error).message };
+      return { nombre, ok: false };
     }
   }),
 };

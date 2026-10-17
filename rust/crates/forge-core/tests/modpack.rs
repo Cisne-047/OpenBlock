@@ -130,10 +130,24 @@ fn un_manifest_que_no_es_de_modpack_se_rechaza() {
         let nombre = caso["nombre"].as_str().unwrap();
         let r = modrinth::parse_cf_manifest(&json_del_caso(nombre));
         assert!(r.is_err(), "«{nombre}» debe rechazarse");
+        // el golden no guarda el mensaje: el de `JSON.parse` cambia entre versiones
+        // de Node y Rust nunca lo va a reproducir. Solo cuenta que falló.
         assert!(!caso["ok"].as_bool().unwrap(), "el TS tampoco lo acepta");
+    }
+}
+
+/// El golden tiene que ser **reproducible**: si guarda algo que cambia entre
+/// versiones de Node, la compuerta de "el golden está al día" del CI falla. Pasó:
+/// el mensaje de `JSON.parse` decía `at position 2` en una versión y `at position
+/// 2 (line 1 column 3)` en otra. Este test deja constancia de la regla.
+#[test]
+fn el_golden_no_guarda_mensajes_de_error_de_v8() {
+    let p = repo_root().join("rust/crates/forge-core/tests/golden/modpack.json");
+    let txt = fs::read_to_string(p).expect("golden");
+    for clave in ["parseError", "serverError"] {
         assert!(
-            caso["error"].as_str().is_some(),
-            "el TS da un mensaje propio"
+            !txt.contains(clave),
+            "el golden no debe guardar «{clave}»: cambia entre versiones de Node"
         );
     }
 }

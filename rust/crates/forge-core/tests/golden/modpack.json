@@ -13,9 +13,7 @@
         "mods/lithium.jar",
         "config/optimizado.toml",
         "mods/sin-env.jar"
-      ],
-      "parseError": null,
-      "serverError": null
+      ]
     },
     {
       "nombre": "formatVersion 2",
@@ -23,9 +21,7 @@
       "serverOk": false,
       "formato": 0,
       "dependencias": {},
-      "servidor": [],
-      "parseError": "Formato .mrpack no soportado: 2",
-      "serverError": null
+      "servidor": []
     },
     {
       "nombre": "formatVersion ausente",
@@ -33,9 +29,7 @@
       "serverOk": false,
       "formato": 0,
       "dependencias": {},
-      "servidor": [],
-      "parseError": "Formato .mrpack no soportado: undefined",
-      "serverError": null
+      "servidor": []
     },
     {
       "nombre": "json roto",
@@ -43,18 +37,14 @@
       "serverOk": false,
       "formato": 0,
       "dependencias": {},
-      "servidor": [],
-      "parseError": "Expected property name or '}' in JSON at position 2 (line 1 column 3)",
-      "serverError": null
+      "servidor": []
     },
     {
       "nombre": "sin ficheros",
       "parseOk": true,
       "serverOk": false,
       "formato": 1,
-      "servidor": [],
-      "parseError": null,
-      "serverError": "Cannot read properties of undefined (reading 'filter')"
+      "servidor": []
     }
   ],
   "curseforge": [
@@ -110,13 +100,11 @@
   "noModpack": [
     {
       "nombre": "manifestType otro",
-      "ok": false,
-      "error": "No es un manifest de modpack CurseForge: otro"
+      "ok": false
     },
     {
       "nombre": "sin manifestType",
-      "ok": false,
-      "error": "No es un manifest de modpack CurseForge: undefined"
+      "ok": false
     }
   ]
 }
