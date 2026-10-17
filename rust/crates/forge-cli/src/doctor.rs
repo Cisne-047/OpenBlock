@@ -19,7 +19,7 @@ use forge_core::doctor::{
     dedupe_por_codigo, etiqueta_pendiente, evaluar_estaticas, evaluar_log, score_y_nota,
     siguen_rotos, ContextoEstatico, ContextoLog, Finding, Hechos, Severity, VistaServidor,
 };
-use forge_core::types::ServerConfig;
+use forge_core::types::{EngineId, ServerConfig};
 use serde::Serialize;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
@@ -277,6 +277,186 @@ pub fn contar(informe: &Informe) -> (usize, usize, usize) {
             .count()
     };
     (n(Severity::Error), n(Severity::Warning), n(Severity::Info))
+}
+
+// ---------- boot test ----------
+
+/// Cuánto se espera a que el server diga «Done», y cada cuánto se mira.
+const BOOT_DEADLINE: Duration = Duration::from_secs(180);
+const BOOT_POLL: Duration = Duration::from_millis(2500);
+/// Lo que se espera tras pedir `stop` por RCON antes de matarlo.
+const RCON_ESPERA: Duration = Duration::from_secs(8);
+/// Lo que se espera tras el kill antes de insistir.
+const KILL_ESPERA: Duration = Duration::from_secs(3);
+
+/// Arranca el server de verdad y mira si llega a `Done` (`bootTest`).
+///
+/// Captura el log por dos vías, como el TS: lo que el proceso escribe por
+/// stdout/stderr **y** lo que aparece al final de `logs/latest.log`. Se solapan, y
+/// da igual: las reglas de log usan el primer match de cada patrón.
+///
+/// Devuelve `true` si el server arrancó. El apagado es limpio por RCON si está
+/// habilitado y el server llegó a arrancar; si no, se mata.
+///
+/// # El fallo del original que se reproduce
+///
+/// `antes` es el tamaño del log **anterior** y la cola se lee a partir de ahí. Paper
+/// **rota** `latest.log` al arrancar (lo comprime a `AAAA-MM-DD-N.log.gz` y empieza
+/// uno nuevo), así que a partir del segundo diagnóstico sobre el mismo directorio el
+/// fichero nuevo es más corto que `antes`: no se lee la cola, no se ve el `Done` y
+/// el informe dice que el server no arrancó. Y como `done` es falso, tampoco se
+/// apaga por RCON — se mata, sin guardar el mundo.
+///
+/// Se reproduce tal cual: el puerto no arregla el original. Está comprobado que los
+/// dos CLI dicen exactamente lo mismo en ese caso, que es lo que hace que la
+/// afirmación sea verificable y no una sospecha.
+pub fn boot_test(cfg: &ServerConfig, dir: &Path, capture: &mut dyn FnMut(String)) -> bool {
+    let path_file = dir.join("runtime").join("java.path");
+    let java_path = match std::fs::read_to_string(&path_file) {
+        Ok(t) => t.trim().to_string(),
+        Err(_) => "java".to_string(),
+    };
+
+    // `readFileSync(jvmFile).split(/\s+/).filter(Boolean)`
+    let args: Vec<String> = match std::fs::read_to_string(dir.join("jvm-args.txt")) {
+        Ok(t) => t.split_whitespace().map(str::to_string).collect(),
+        Err(_) => Vec::new(),
+    };
+
+    let runner = if cfg!(windows) { "run.bat" } else { "run.sh" };
+    let use_runner = dir.join(runner).exists();
+
+    let log_path = dir.join("logs").join("latest.log");
+    // el TS cuenta unidades UTF-16 y aquí bytes; la diferencia solo aparece si el
+    // log ya tenía texto multibyte, y en ese caso los dos leen de más, no de menos
+    let antes = std::fs::read(&log_path).map(|b| b.len()).unwrap_or(0);
+
+    let mut cmd = if use_runner {
+        let mut c = Command::new(if cfg!(windows) { "cmd.exe" } else { "bash" });
+        if cfg!(windows) {
+            c.arg("/c");
+        }
+        c.arg(runner).arg("nogui");
+        c
+    } else {
+        let mut c = Command::new(&java_path);
+        c.args(&args).arg("-jar");
+        c.arg(
+            forge_core::doctor::jar_name_from_start_script(&VistaDisco::new(dir))
+                .unwrap_or_else(|| "server.jar".to_string()),
+        );
+        c.arg(if cfg.engine == EngineId::Vanilla {
+            "nogui"
+        } else {
+            "--nogui"
+        });
+        c
+    };
+
+    let mut hijo = match cmd
+        .current_dir(dir)
+        .stdin(Stdio::null())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+    {
+        Ok(h) => h,
+        Err(e) => {
+            capture(format!("No se pudo arrancar el server: {e}"));
+            return false;
+        }
+    };
+
+    // los dos pipes se leen en hilos: si no, el server se queda bloqueado cuando
+    // llena el buffer y nunca llega a `Done`
+    let (tx, rx) = std::sync::mpsc::channel::<String>();
+    for pipe in [
+        hijo.stdout.take().map(Pipe::Out),
+        hijo.stderr.take().map(Pipe::Err),
+    ]
+    .into_iter()
+    .flatten()
+    {
+        let tx = tx.clone();
+        std::thread::spawn(move || {
+            let lector: Box<dyn std::io::Read + Send> = match pipe {
+                Pipe::Out(s) => Box::new(s),
+                Pipe::Err(s) => Box::new(s),
+            };
+            let mut lector = std::io::BufReader::new(lector);
+            let mut linea = String::new();
+            while std::io::BufRead::read_line(&mut lector, &mut linea).unwrap_or(0) > 0 {
+                let limpia = linea.trim();
+                if !limpia.is_empty() && tx.send(limpia.to_string()).is_err() {
+                    break;
+                }
+                linea.clear();
+            }
+        });
+    }
+    drop(tx);
+
+    let mut done = false;
+    let limite = Instant::now() + BOOT_DEADLINE;
+    while Instant::now() < limite {
+        std::thread::sleep(BOOT_POLL);
+        // lo que el proceso haya escrito por sus pipes
+        while let Ok(l) = rx.try_recv() {
+            capture(l);
+        }
+        // `child.exitCode !== null || child.signalCode`
+        if matches!(hijo.try_wait(), Ok(Some(_))) {
+            break;
+        }
+        // y lo que haya crecido el log
+        if let Ok(txt) = std::fs::read(&log_path) {
+            if txt.len() > antes {
+                let cola = String::from_utf8_lossy(&txt[antes..]).to_string();
+                for l in cola.split('\n') {
+                    if !l.trim().is_empty() {
+                        capture(l.trim().to_string());
+                    }
+                }
+                if regex_lite(r"Done \([0-9.]+s\)!").is_some_and(|re| re.is_match(&cola)) {
+                    done = true;
+                    break;
+                }
+                if regex_lite(r#"Failed to start the minecraft server|Exception in thread "main""#)
+                    .is_some_and(|re| re.is_match(&cola))
+                {
+                    break;
+                }
+            }
+        }
+    }
+
+    // lo que quedara por leer, para que las reglas vean el final del arranque
+    while let Ok(l) = rx.try_recv() {
+        capture(l);
+    }
+
+    // apagado: limpio por RCON si está arriba, kill si no
+    if done && cfg.rcon.enabled {
+        let _ = crate::rcon::with_rcon("127.0.0.1", cfg.rcon.port, &cfg.rcon.password, |r| {
+            r.command("stop")
+        });
+        std::thread::sleep(RCON_ESPERA);
+    }
+    if matches!(hijo.try_wait(), Ok(None)) {
+        // el TS manda SIGTERM y luego SIGKILL; `kill` de Rust es SIGKILL en Unix y
+        // TerminateProcess en Windows, así que aquí no hay apagado suave
+        let _ = hijo.kill();
+        std::thread::sleep(KILL_ESPERA);
+        if matches!(hijo.try_wait(), Ok(None)) {
+            let _ = hijo.kill();
+        }
+    }
+    done
+}
+
+enum Pipe {
+    Out(std::process::ChildStdout),
+    Err(std::process::ChildStderr),
 }
 
 #[cfg(test)]

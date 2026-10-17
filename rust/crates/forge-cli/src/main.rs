@@ -160,10 +160,14 @@ fn plan_cmd(args: &[String]) -> ExitCode {
 fn doctor_cmd(args: &[String]) -> ExitCode {
     let mut dir = ".".to_string();
     let mut json = false;
+    let mut boot = false;
     let mut i = 0;
     while i < args.len() {
         match args[i].as_str() {
             "--json" => json = true,
+            // el TS arranca el server por defecto; aquí hay que pedirlo, porque el
+            // boot test lanza un server de verdad y tarda minutos
+            "--boot" => boot = true,
             "--dir" => {
                 i += 1;
                 match args.get(i) {
@@ -173,12 +177,6 @@ fn doctor_cmd(args: &[String]) -> ExitCode {
                         return ExitCode::from(2);
                     }
                 }
-            }
-            "--boot" => {
-                // el TS lo hace por defecto; aquí todavía no está portado, y callarlo
-                // daría un informe que dice que el server arranca sin haberlo probado
-                eprintln!("El boot test todavía no está portado: usa --json o quítale --boot.");
-                return ExitCode::from(2);
             }
             otro => {
                 eprintln!("opción desconocida para doctor: {otro}");
@@ -213,7 +211,14 @@ fn doctor_cmd(args: &[String]) -> ExitCode {
     }
 
     let donde = PathBuf::from(&cfg.server_dir);
-    let informe = doctor::doctor_readonly(&cfg, &donde, &[], (false, false));
+    let mut lineas: Vec<String> = Vec::new();
+    let boot_ok = if boot {
+        eprintln!("== Dry run: arrancando el server en modo test ==");
+        doctor::boot_test(&cfg, &donde, &mut |l| lineas.push(l))
+    } else {
+        false
+    };
+    let informe = doctor::doctor_readonly(&cfg, &donde, &lineas, (boot, boot_ok));
 
     if json {
         match serde_json::to_string_pretty(&informe) {
@@ -226,6 +231,16 @@ fn doctor_cmd(args: &[String]) -> ExitCode {
     } else {
         let (errores, avisos, infos) = doctor::contar(&informe);
         println!("\n== Doctor: {} ({}) ==", cfg.name, cfg.engine.as_str());
+        if informe.boot_tested {
+            println!(
+                "{}",
+                if informe.boot_ok {
+                    "✓ El server arranca (Done)."
+                } else {
+                    "✗ El server no completó el arranque."
+                }
+            );
+        }
         for f in &informe.findings {
             println!("  [{}] {} — {}", f.severity, f.code, f.message);
         }

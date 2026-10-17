@@ -48,7 +48,8 @@ vigila al otro lado. `forge-api` es el único que hace red, igual que en el TS s
 | `doctor` (reglas de log) | portado, con sus descripciones |
 | `doctor` (reglas estáticas) | portado, con la vista y los hechos inyectados |
 | `doctor` (informe, `forge doctor --json`) | portado y comparado con el TS en vivo |
-| `doctor` (boot test y arreglos) | pendiente |
+| `doctor` (boot test) | portado: arranca, captura el log y apaga por RCON |
+| `doctor` (los 12 `apply` de los fixes) | pendiente |
 | CLI | `detect`, `plan`, `dump`, `latest` y `rcon` funcionan |
 
 **El núcleo generador está completo y con paridad byte a byte**: los 23 ficheros
@@ -128,6 +129,16 @@ incluido. Ese `source` es además la prueba de que el `\r?` de
 (`paper-1.20.4-499.jar`) se leyó del `start.bat` **con finales CRLF** que acaba
 de generar `forge dump`.
 
+El **boot test** se verifica arrancando un server de verdad. El camino completo
+—`forge plan`, `forge dump`, bajar el jar del plan y `forge doctor --boot`— da
+`bootTested: true`, `bootOk: true` y `SANO`, y con el jar corrompido da
+`bootOk: false` en tres segundos (el bucle corta al ver que el proceso murió, sin
+esperar los 180 s). Las dos cosas salen **idénticas al TS**, y en el arranque real
+sale además un hallazgo de verdad —`TICK_BEHIND`, con la descripción
+«Bajar view-distance de 8 a 6» calculada desde la config— y el `pending` con él.
+Que los dos coincidan en un log de 2600 líneas de Paper es la prueba de que la
+captura por stdout/stderr y por la cola del log hace lo mismo en los dos lados.
+
 Lo que la paridad ha cazado, y que ninguna lectura del código habría visto:
 
 - **Los acrónimos de serde**: `ram_mb` sale `ramMb` y el JSON dice `ramMB`;
@@ -144,6 +155,14 @@ Lo que la paridad ha cazado, y que ninguna lectura del código habría visto:
   doctor habría dicho «falta el jar del engine» en **todos** los proyectos
   generados en Windows. Lo cazó el test del propio port, no el golden: el golden
   escribe los fixtures con LF.
+- **El boot test solo funciona en el primer arranque de un directorio.** `antes` es
+  el tamaño del log anterior y la cola se lee desde ahí, pero Paper **rota**
+  `latest.log` al arrancar: el fichero nuevo es más corto, la cola sale vacía, no
+  se ve el `Done` y el informe dice que el server no arrancó. Peor: como `done` es
+  falso, tampoco se apaga por RCON — se mata, sin guardar el mundo. No es una
+  sospecha: los dos CLI dicen **lo mismo byte a byte** en ese caso (verificado con
+  `2026-10-17-1.log.gz` y `-2.log.gz` en `logs/`), que es lo que hace que se pueda
+  afirmar sin adivinar. Se reproduce, y arreglarlo es otra conversación.
 - **El regex de `parseMc`**, tres veces. Mis tres lecturas eran falsas.
 - **Dos líneas en blanco de diferencia** en `install.sh` e `install.ps1`. No era
   lógica: cuando **no** hay installer, la línea de apertura del ternario del
