@@ -146,11 +146,66 @@ Deliberadas y anotadas, como la lista que DistroForge mantiene en su
    regex eran falsas y el golden las cazó una a una. Si algún día aparece una
    entrada rara, el sitio para añadirla es `tests/parity-golden.ts`.
 
+## Cómo continuar
+
+### Qué falta, en orden
+
+| fichero TS | líneas | a dónde va | por qué |
+|---|---|---|---|
+| `src/api/engines.ts` | 237 | `forge-api` | resuelve URLs de PaperMC/Fabric/Forge contra sus APIs |
+| `src/plan.ts` | 215 | `forge-api` (resolver) + núcleo (modelo, ya portado) | convierte config en manifiesto de descargas |
+| `src/doctor.ts` | 629 | `forge-cli` | 16 reglas, boot test, fixes y score; necesita red, disco y RCON |
+| `src/rcon.ts` (cliente) | ~60 | `forge-cli` | el códec ya está en el núcleo; falta el socket |
+| `src/apply.ts`, `java.ts` | 360 | `forge-cli` | escritura, descargas, JDK |
+| `src/advanced.ts`, `guided.ts`, `index.ts` | 729 | `forge-cli` | la CLI completa |
+
+**El doctor es el trozo grande y el que más valor tiene.** El orden que menos
+sufrimiento da: `engines` → `plan` (con eso `forge generate` funciona de verdad) →
+doctor → el resto de la CLI.
+
+### La receta para portar un módulo con paridad
+
+1. **Decide dónde va.** ¿Toca disco, red, procesos o entorno? Si no, va al núcleo y
+   tiene paridad. Si sí, va a `forge-api` (red) o `forge-cli` (el resto), y lo que
+   se pueda separar en funciones puras se separa para poder compararlo.
+2. **Porta con el orden de campos idéntico** en los structs que se serialicen:
+   `JSON.stringify` y `serde_json` escriben en orden de declaración, y ahí es donde
+   se cuela una diferencia que luego no reimporta.
+3. **Añade los casos al golden** en `tests/parity-golden.ts` —incluidos los bordes
+   que el TS no prueba— y regenera con `npm run parity:golden`.
+4. **Escribe el test de Rust** en `rust/crates/forge-core/tests/`, comparando contra
+   el golden. Para las APIs ajenas no hay golden posible: se comparan las dos
+   implementaciones contra la API real, como `forge latest`.
+5. **`npm run parity`** y **`cargo clippy --all-targets -- -D warnings`**. El clippy
+   del CI es más nuevo que el local y encuentra cosas que aquí no saltan; han sido
+   tres veces ya.
+6. **`git diff --exit-code -- rust/crates/forge-core/tests/golden`** para confirmar
+   que el golden es reproducible. Tiene que serlo: si guarda algo que depende de la
+   versión de Node, el CI falla —pasó con el mensaje de `JSON.parse`—.
+7. **Commit y espera al CI de verdad.** Tres fallos de este port los encontró el CI
+   y no la máquina local.
+
+### Lo que no hay que "arreglar" al portar
+
+El puerto reproduce el original **aunque el original esté discutible**. Ya han
+salido cuatro casos y los cuatro están anotados arriba: el quirk UTF-8/latin1 del
+RCON, el `BigInt` sin límite del benchmark, las dos líneas en blanco del ternario,
+y las entradas sin `env` de los modpacks. Si algo parece un fallo del TS, se
+reproduce y se anota; arreglarlo es otra conversación, y `diff -r` deja de servir
+para verificar el port en cuanto las dos versiones divergen.
+
+### Qué NO mover a `legacy/`
+
+El objetivo hablaba de dejar el TS en `legacy/`, como hizo DistroForge. **Aquí no
+procede todavía**: el TS sigue siendo la implementación que está publicada en npm y
+la referencia contra la que se verifica la paridad. Moverlo ahora rompería el
+golden, el CI y la publicación a la vez. Se moverá cuando el Rust sea el que se
+distribuye, y entonces sí tendrá sentido.
 ## Por qué Rust
 
 No arregla el reparto —ese problema ya está resuelto publicando en npm, y
 `cargo install` sería *peor* para el usuario porque le obligaría a tener Rust—.
 Se hace porque un binario único sin dependencia de Node es un final mejor para
 una CLI que la gente va a ejecutar en su máquina, y porque el núcleo ya es puro y
-tiene 86 tests como contrato. El reparto en npm sigue funcionando durante todo el
+tiene 87 tests como contrato. El reparto en npm sigue funcionando durante todo el
 port: no hay una fase en la que OpenBlock esté roto.
