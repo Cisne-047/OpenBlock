@@ -28,7 +28,7 @@
     "typecheck": "tsc --noEmit",
     "build": "tsc -p tsconfig.build.json",
     "test": "vitest run",
-    "smoke": "node dist/index.js self-test",
+    "smoke": "npm run build && node dist/index.js self-test",
     "prepublishOnly": "npm run build && npm run typecheck && npm test"
   },
   "dependencies": {
