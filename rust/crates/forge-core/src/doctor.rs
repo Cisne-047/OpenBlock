@@ -665,7 +665,7 @@ fn regla_java_major(
         Some(m) => m.to_string(),
         None => "?".to_string(),
     };
-    Some(hallazgo(
+    let mut f = hallazgo(
         Severity::Error,
         "JAVA_MAJOR",
         "runtime/java.path",
@@ -678,7 +678,11 @@ fn regla_java_major(
             format!("Instalar Temurin JDK {requerido} en runtime/"),
             false,
         )),
-    ))
+    );
+    // el fix necesita saber qué versión dejar en runtime/, y aquí no hay match del
+    // que sacarla: sale de la MC
+    f.fix_args = vec![requerido.to_string()];
+    Some(f)
 }
 
 fn regla_port_busy(v: &dyn VistaServidor, c: &ContextoEstatico, h: &dyn Hechos) -> Option<Finding> {

@@ -49,8 +49,10 @@ vigila al otro lado. `forge-api` es el único que hace red, igual que en el TS s
 | `doctor` (reglas estáticas) | portado, con la vista y los hechos inyectados |
 | `doctor` (informe, `forge doctor --json`) | portado y comparado con el TS en vivo |
 | `doctor` (boot test) | portado: arranca, captura el log y apaga por RCON |
-| `doctor` (9 de los 12 fixes) | portado; faltan `install-java` ×2 y `update-plugin` |
-| CLI | `detect`, `plan`, `dump`, `latest` y `rcon` funcionan |
+| `doctor` (los 12 fixes) | portado: informa, arregla y arranca el server |
+| `net::downloadTo` (descarga con hash y reintento) | portado, con servidor falso en los tests |
+| `java::ensureJava` (JDK del sistema o Temurin) | portado; ver la nota de abajo |
+| CLI | `detect`, `plan`, `dump`, `doctor`, `latest` y `rcon` funcionan |
 
 **El núcleo generador está completo y con paridad byte a byte**: los 23 ficheros
 del proyecto salen idénticos al TypeScript, `openblock.json` incluido. Los tiers
@@ -146,6 +148,31 @@ Salen idénticos: `eula.txt`, el `server.properties` parcheado conservando sus
 finales CRLF, y el `openblock.json` reescrito. El escenario lleva la contraseña
 RCON larga a propósito: ese fix genera una contraseña aleatoria y no puede
 compararse por el valor (solo por la forma, que sí tiene su test).
+
+El fix de `update-plugin` no se puede provocar a voluntad —haría falta que
+Modrinth publique una versión nueva de un plugin conocido justo cuando se ejecuta
+el test—, así que se prueba con un **servidor HTTP local**: se le da al hallazgo
+la url, el nombre y el sha512, y se comprueba que borra el jar viejo, escribe el
+nuevo y **rechaza** el fichero si el hash no es el suyo. Es el mismo patrón que el
+servidor falso de RCON.
+
+### Lo que está portado pero no probado, y se dice
+
+`install-java` se verificó de punta a punta contra el TS: con una config de 1.21.4
+en una máquina que tiene Java 17 en el PATH, los dos bajan a buscar un JDK 21, los
+dos encuentran el **mismo** (`jdk-21.0.11.10-hotspot`, no el `jre-21` que también
+reporta 21) y escriben el mismo `runtime/java.path`. Los directorios salen
+idénticos.
+
+Lo que **no** está probado es la rama de descarga: el camino que baja un Temurin de
+Adoptium y lo descomprime con `tar`. Haría falta una máquina sin ese JDK, y bajarse
+200 MB en cada `cargo test` no es una opción. Lo que sí está probado de esa rama:
+la lectura de la respuesta de Adoptium (con un recorte de la respuesta **real** en
+`tests/fixtures/adoptium-21.json`) y la detección de la raíz tras extraer. Que el
+`tar` extraiga y que el JDK extraído reporte la versión pedida solo se sabrá el día
+que se ejecute en una máquina sin JDK; queda anotado como lo que es.
+
+Y `javaBinDir` no se portó: el TS la exporta y **no la usa nadie**.
 
 Lo que la paridad ha cazado, y que ninguna lectura del código habría visto:
 

@@ -25,9 +25,6 @@ use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::time::{Duration, Instant};
 
-/// Timeout de `java -version`, el mismo que pone el TS (`execFile` con 15000 ms).
-const JAVA_TIMEOUT: Duration = Duration::from_secs(15);
-
 // ---------- el directorio ----------
 
 /// `VistaServidor` sobre un directorio de verdad.
@@ -73,27 +70,10 @@ impl VistaServidor for VistaDisco {
 pub struct HechosReales;
 
 impl Hechos for HechosReales {
-    /// `javaMajorOf`: `java -version` y a leer la versión del texto.
-    ///
-    /// El TS usa `execFile`, no `exec`, así que una ruta con espacios funciona
-    /// igual que aquí: los argumentos van sueltos y no pasan por el shell.
+    /// `javaMajorOf`, que vive en `java.rs` porque además lo usa el fix de
+    /// `install-java` para comprobar lo que acaba de bajar.
     fn java_mayor(&self, ruta_java: &str) -> Option<u32> {
-        let salida = ejecutar_con_timeout(ruta_java, &["-version"], JAVA_TIMEOUT)?;
-        // `stderr || stdout`: gana el stderr, y si está vacío el stdout
-        let texto = if salida.stderr.trim().is_empty() {
-            salida.stdout
-        } else {
-            salida.stderr
-        };
-        let re = regex_lite(r#"version "(\d+)(?:\.(\d+))?"#)?;
-        let caps = re.captures(&texto)?;
-        let mayor: u32 = caps.get(1)?.as_str().parse().ok()?;
-        // Java 8 se anuncia como "1.8.0_402"
-        if mayor == 1 {
-            caps.get(2)?.as_str().parse().ok()
-        } else {
-            Some(mayor)
-        }
+        crate::java::java_major_of(ruta_java)
     }
 
     fn puerto_libre(&self, puerto: u16) -> bool {
@@ -111,47 +91,6 @@ impl Hechos for HechosReales {
         let loaders = vec![loader.to_string()];
         forge_api::modrinth::latest_version(slug, Some(&juegos), Some(&loaders)).ok()
     }
-}
-
-struct Salida {
-    stdout: String,
-    stderr: String,
-}
-
-/// Ejecuta un programa y recoge su salida, con deadline.
-///
-/// `Command` no trae timeout, así que se sondea `try_wait` y se mata al pasarse.
-/// Es suficiente para `java -version`, que escribe cuatro líneas y termina; no vale
-/// para un proceso que escupa megabytes por el pipe.
-fn ejecutar_con_timeout(programa: &str, args: &[&str], timeout: Duration) -> Option<Salida> {
-    let mut hijo = Command::new(programa)
-        .args(args)
-        .stdin(Stdio::null())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()
-        .ok()?;
-
-    let limite = Instant::now() + timeout;
-    loop {
-        match hijo.try_wait() {
-            Ok(Some(_)) => break,
-            Ok(None) => {
-                if Instant::now() >= limite {
-                    let _ = hijo.kill();
-                    break;
-                }
-                std::thread::sleep(Duration::from_millis(25));
-            }
-            Err(_) => break,
-        }
-    }
-
-    let salida = hijo.wait_with_output().ok()?;
-    Some(Salida {
-        stdout: String::from_utf8_lossy(&salida.stdout).to_string(),
-        stderr: String::from_utf8_lossy(&salida.stderr).to_string(),
-    })
 }
 
 fn regex_lite(patron: &str) -> Option<regex::Regex> {
@@ -405,6 +344,26 @@ fn aplicar_uno(f: &Finding, cfg: &mut ServerConfig, dir: &Path) -> Option<String
                 },
             )
             .is_ok()
+        }
+        "install-java" => {
+            // La versión la trae el hallazgo: en el log es la que pide el server
+            // (`fix_args[0]`), y en la regla estática la que pide esa MC.
+            let major = f.fix_args.first().and_then(|m| m.parse::<u32>().ok())?;
+            match crate::java::ensure_java(major, dir) {
+                Ok(rt) => {
+                    let runtime = dir.join("runtime");
+                    std::fs::create_dir_all(&runtime).is_ok()
+                        && std::fs::write(
+                            runtime.join("java.path"),
+                            crate::java::ruta_para_archivo(&rt),
+                        )
+                        .is_ok()
+                }
+                Err(e) => {
+                    eprintln!("No se pudo dejar un Java {major}: {e}");
+                    false
+                }
+            }
         }
         // pendiente de portar: necesita bajar un JDK (ensureJava)
         _ => false,
@@ -774,21 +733,6 @@ mod tests {
                 "{p} deberia ser base36"
             );
         }
-    }
-
-    #[test]
-    fn java_ocho_se_anuncia_como_uno_ocho() {
-        // la regla del TS: `maj === 1 ? m[2] : maj`
-        let re = regex_lite(r#"version "(\d+)(?:\.(\d+))?"#).unwrap();
-        let caps = re.captures(r#"openjdk version "1.8.0_402""#).unwrap();
-        assert_eq!(&caps[1], "1");
-        assert_eq!(&caps[2], "8");
-
-        let caps = re
-            .captures(r#"openjdk version "21.0.2" 2024-01-16"#)
-            .unwrap();
-        assert_eq!(&caps[1], "21");
-        assert!(caps.get(2).is_some());
     }
 
     #[test]

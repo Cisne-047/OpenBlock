@@ -15,6 +15,7 @@
 
 mod detect;
 mod doctor;
+mod java;
 mod rcon;
 
 use std::fs;
