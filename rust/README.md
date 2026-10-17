@@ -58,7 +58,9 @@ vigila al otro lado. `forge-api` es el único que hace red, igual que en el TS s
 | `self-test`: el ciclo | portado y ejecutado de verdad |
 | `output::zipProject` (el zip portable) | portado y comparado: mismas entradas y mismo contenido |
 | `advanced` (las flags y la config) | portado: flag > config previa > hardware |
-| CLI | `detect`, `plan`, `dump`, `install`, `generate`, `doctor`, `backup`, `stop`, `self-test`, `latest` y `rcon` |
+| `hw::bench` (la medida, no solo la fórmula) | portado, con una divergencia que se explica |
+| CLI | `detect`, `bench`, `plan`, `dump`, `install`, `generate`, `info`, `doctor`, `backup`, `stop`, `self-test`, `latest`, `rcon` y `help` |
+| **falta** | el modo guiado (`guided.ts`) |
 
 **El núcleo generador está completo y con paridad byte a byte**: los 23 ficheros
 del proyecto salen idénticos al TypeScript, `openblock.json` incluido. Los tiers
@@ -291,6 +293,27 @@ distintos**, y yo había portado uno solo.
 Los dos se reproducen ahora por separado, y la entropía del primero sale del
 sistema operativo (`getrandom`), no del reloj: el TS usa `crypto.randomBytes` y una
 contraseña de RCON no es sitio para un xorshift.
+
+### La medida del benchmark, que sí diverge y se dice
+
+La **fórmula** del score está portada y con golden. La **medida** no puede estarlo, y
+al portarla se vio por qué:
+
+| | cpuScore | duración |
+|---|---|---|
+| TS (BigInt de V8) | ~8 000 | ~1,9 s |
+| Rust con `BigUint` propio | **1** | **43 s** |
+| Rust con `u64` | ~107 000 | 1,8 s |
+
+El original mezcla con `BigInt` y ese estado crece sin límite, así que su número
+mide, en buena parte, **lo rápido que sea el BigInt de su motor**. Reproducir el
+quirk con un bignum propio da un score mil veces menor y el tier se cae a la patata;
+medir con `u64` da uno trece veces mayor. Ninguno de los dos es «el del TS», porque
+el del TS no es una medida de la CPU.
+
+Se mide con `u64` —que es lo que un benchmark de CPU quiere medir— y queda dicho que
+el número **no es comparable**: lo que `classifyHardware` hace con él está topado a
+10 puntos, así que la clasificación no cambia.
 
 Lo que la paridad ha cazado, y que ninguna lectura del código habría visto:
 

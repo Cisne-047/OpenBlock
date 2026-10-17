@@ -15,6 +15,7 @@
 
 mod advanced;
 mod apply;
+mod bench;
 mod detect;
 mod doctor;
 mod java;
@@ -25,10 +26,61 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
+/// El texto de ayuda, portado de `src/help.ts`.
+///
+/// El del TS dice `openblock` y lista los comandos del TS; este dice `forge` y lista
+/// los que existen aquí, porque una ayuda que ofrece comandos que no están es peor
+/// que no tenerla. Los que faltan respecto al TS van marcados al final.
+const HELP: &str = r#"
+forge — forja servidores de Minecraft según tu hardware (Windows/Linux)
+
+  forge bench                     Mide CPU y disco (~2 s) y saca el perfil
+  forge detect [--json]           Hardware + tier + recomendación
+  forge plan <config> [out.json]  Resuelve el plan contra las APIs
+  forge generate [config] [...]   Genera el proyecto; --zip out.zip lo empaqueta
+  forge install [config] [...]    Como generate, y además baja todo y deja el
+                                  server listo (Java, engine, plugins, installer)
+  forge dump <config> <plan> <dir> [n]
+                                  Escribe el proyecto desde config y plan
+  forge info <dir>                Config del server instalado
+  forge doctor [--dir D]          Mini-IA: dry run del server, errores y avisos
+      --boot                      arranca el server de verdad y lee su log
+      --yes                       aplica los fixes seguros (los considerables no)
+      --json                      informe JSON (para scripts). Implica solo lectura
+  forge backup <dir>              Ejecuta backup.sh/.ps1 ahora
+  forge stop <dir>                Apaga por RCON (tiene que estar arriba)
+  forge self-test                 Instala un Paper de verdad, lo arranca y lo
+                                  diagnostica; falla si algo no cuadra. Para CI
+      --mc 1.20.4 --port 25599 --keep
+  forge latest                    Última release de Minecraft (consulta Mojang)
+  forge rcon <host> <puerto> <cmd>
+                                  Manda un comando por RCON
+                                  (pass: OPENBLOCK_RCON_PASSWORD)
+  forge help                      Esta ayuda
+
+Flags de config (generate/install), con la precedencia flag > --config > hardware:
+  --config openblock.json         base reimportable (round-trip)
+  --name X --mc 1.21.4 --engine paper|purpur|folia|fabric|quilt|forge|neoforge|vanilla
+  --ram-mb 8192 --players 20 --port 25565 --vd 8 --sd 6 --dir ./server
+  --profile conservative|balanced|aggressive --pregen 4000
+  --modpack <url-mrpack> --target linux|windows|both
+  --no-service --no-backup --no-rcon --no-pregen --dry-run --yes --force
+  --build N (paper/purpur/folia/forge/neoforge), --loader-build N,
+  --installer-build N (fabric/quilt), --custom url1,ruta2 (plugins/mods propios)
+  --cores N (hilos para los scripts)
+
+Falta respecto al CLI de TypeScript: el modo guiado (`guided`) y `advanced`
+—aquí las flags del modo avanzado se dan a `generate` y a `install`—.
+
+Project format: openblock.json round-trip, como DistroForge.
+"#;
+
 fn uso() -> ExitCode {
     eprintln!("uso: forge <comando> [opciones]");
     eprintln!();
     eprintln!("  detect [--json]                 hardware detectado (JSON igual que el TS)");
+    eprintln!("  bench                           mide CPU y disco (~4 s) y saca el perfil");
+    eprintln!("  info <dir>                      config del server instalado");
     eprintln!(
         "  plan <config> [plan.json]       resuelve el plan contra las APIs (sin -o, a stdout)"
     );
@@ -57,6 +109,12 @@ fn main() -> ExitCode {
         Some("dump") => dump_cmd(&args[1..]),
         Some("install") => install_cmd(&args[1..]),
         Some("generate") => generate_cmd(&args[1..]),
+        Some("bench") => bench_cmd(),
+        Some("info") => info_cmd(&args[1..]),
+        Some("help") | Some("--help") | Some("-h") => {
+            println!("{HELP}");
+            ExitCode::SUCCESS
+        }
         Some("backup") => backup_cmd(&args[1..]),
         Some("stop") => stop_cmd(&args[1..]),
         Some("self-test") => self_test_cmd(&args[1..]),
@@ -346,6 +404,67 @@ fn install_cmd(args: &[String]) -> ExitCode {
     }
     ExitCode::SUCCESS
 }
+/// `forge bench` — mide CPU y disco (~4 s) y saca el perfil con la medida dentro.
+///
+/// Es el `openblock bench` del TS. Imprime JSON, igual que `forge detect`: es lo que
+/// un script consume, y la tabla con colores del TS no se puede comparar.
+fn bench_cmd() -> ExitCode {
+    eprintln!("Midiendo CPU y disco...");
+    let mut hw = detect::detect_hardware();
+    hw.bench = Some(bench::run_benchmark());
+    match serde_json::to_string_pretty(&hw) {
+        Ok(s) => {
+            println!("{s}");
+            ExitCode::SUCCESS
+        }
+        Err(e) => {
+            eprintln!("No se pudo serializar: {e}");
+            ExitCode::FAILURE
+        }
+    }
+}
+
+/// `forge info <dir>` — la config del server instalado, como una tabla.
+fn info_cmd(args: &[String]) -> ExitCode {
+    let dir = args.first().map(String::as_str).unwrap_or(".");
+    let raiz = resolver(dir);
+    let p = raiz.join("openblock.json");
+    let cfg_txt = match fs::read_to_string(&p) {
+        Ok(t) => t,
+        Err(_) => {
+            eprintln!("No existe {}: instala el server primero", p.display());
+            return ExitCode::FAILURE;
+        }
+    };
+    let cfg: forge_core::ServerConfig = match serde_json::from_str(&cfg_txt) {
+        Ok(c) => c,
+        Err(e) => {
+            eprintln!("openblock.json inválido: {e}");
+            return ExitCode::FAILURE;
+        }
+    };
+    println!("\n== {} ==", cfg.name);
+    for (k, v) in [
+        (
+            "Engine",
+            format!("{} {}", cfg.engine.as_str(), cfg.mc_version),
+        ),
+        ("RAM", format!("{} MB", cfg.ram_mb)),
+        ("Puerto", cfg.port.to_string()),
+        ("Jugadores", cfg.players.to_string()),
+        ("Perfil", cfg.performance.as_str().to_string()),
+        ("Pregen", cfg.pregen_radius.to_string()),
+        ("Directorio", cfg.server_dir.clone()),
+        (
+            "Servicio",
+            if cfg.service.enabled { "sí" } else { "no" }.to_string(),
+        ),
+    ] {
+        println!("  {k:<12} {v}");
+    }
+    ExitCode::SUCCESS
+}
+
 fn generate_cmd(args: &[String]) -> ExitCode {
     let a = match advanced::parse_avanzados(args) {
         Ok(a) => a,
