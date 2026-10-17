@@ -57,6 +57,7 @@ vigila al otro lado. `forge-api` es el único que hace red, igual que en el TS s
 | `self-test`: el veredicto | portado, con golden (es lo que decide si un CI pasa) |
 | `self-test`: el ciclo | portado y ejecutado de verdad |
 | `output::zipProject` (el zip portable) | portado y comparado: mismas entradas y mismo contenido |
+| `advanced` (las flags y la config) | portado: flag > config previa > hardware |
 | CLI | `detect`, `plan`, `dump`, `install`, `generate`, `doctor`, `backup`, `stop`, `self-test`, `latest` y `rcon` |
 
 **El núcleo generador está completo y con paridad byte a byte**: los 23 ficheros
@@ -270,6 +271,26 @@ porque los dos proyectos están en directorios distintos.
 Las entradas van **sin comprimir**, como las del TS: `generateAsync` sin
 `compression` usa `STORE`. Comprimirlas daría un zip más pequeño y ya no sería lo
 que genera el original.
+
+### Las flags del modo avanzado, y las dos contraseñas
+
+`forge generate` acepta las mismas flags que el TS (`--engine`, `--mc`, `--ram-mb`,
+`--vd`, `--sd`, `--profile`, `--pregen`, `--no-backup`, `--custom`…), con la misma
+precedencia: **flag > config previa > hardware**. Comparado con el TS con un juego
+de flags de verdad, salen 17 ficheros idénticos salvo tres líneas: el `serverDir`
+(que tiene que diferir) y la contraseña de RCON, que es aleatoria.
+
+Y ese diff encontró un fallo del port: **el TS tiene dos generadores de contraseña
+distintos**, y yo había portado uno solo.
+
+| dónde | cómo | forma |
+|---|---|---|
+| `ensureRconPassword` (apply) | `randomBytes(8).toString("hex")` | 16 hexadecimales |
+| fix `rcon-password` del doctor | `Math.random().toString(36)` | 14 en base 36 |
+
+Los dos se reproducen ahora por separado, y la entropía del primero sale del
+sistema operativo (`getrandom`), no del reloj: el TS usa `crypto.randomBytes` y una
+contraseña de RCON no es sitio para un xorshift.
 
 Lo que la paridad ha cazado, y que ninguna lectura del código habría visto:
 

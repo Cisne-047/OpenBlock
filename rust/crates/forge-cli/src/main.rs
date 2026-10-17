@@ -13,6 +13,7 @@
 //!
 //! En construcción: la pregeneración de install y el modo guiado.
 
+mod advanced;
 mod apply;
 mod detect;
 mod doctor;
@@ -298,78 +299,34 @@ fn doctor_cmd(args: &[String]) -> ExitCode {
 /// RCON. La pregeneración va apagada por defecto —en el TS es al revés, con
 /// --no-pregen— porque son 20 minutos de espera máxima en un install.
 fn install_cmd(args: &[String]) -> ExitCode {
-    if args.is_empty() {
-        eprintln!("uso: forge install <config.json> [--force] [--dry-run]");
-        return ExitCode::from(2);
-    }
-    let cfg_txt = match fs::read_to_string(&args[0]) {
-        Ok(t) => t,
+    let a = match advanced::parse_avanzados(args) {
+        Ok(a) => a,
         Err(e) => {
-            eprintln!("No se pudo leer {}: {e}", args[0]);
-            return ExitCode::FAILURE;
+            eprintln!("{e}");
+            return ExitCode::from(2);
         }
     };
-    let mut cfg: forge_core::ServerConfig = match serde_json::from_str(&cfg_txt) {
+    let mut cfg = match advanced::construir_config(&a) {
         Ok(c) => c,
         Err(e) => {
-            eprintln!("{} no es una config válida: {e}", args[0]);
+            eprintln!("{e}");
             return ExitCode::FAILURE;
         }
     };
-    let mut opts = apply::OpcionesApply {
-        cores: num_cpus(),
-        ..Default::default()
+    let opts = apply::OpcionesApply {
+        cores: a.cores.unwrap_or_else(num_cpus),
+        dry_run: a.dry_run,
+        force: a.force,
     };
-    // la pregeneracion NO va por defecto: arranca un server y espera a Done (hasta
-    // 20 minutos). En el TS es al reves, con --no-pregen para quitarla.
-    let mut pregen = false;
-    let mut i = 1;
-    while i < args.len() {
-        match args[i].as_str() {
-            "--force" => opts.force = true,
-            "--dry-run" => opts.dry_run = true,
-            "--pregen" => pregen = true,
-            "--dir" => {
-                i += 1;
-                match args.get(i) {
-                    Some(d) => cfg.server_dir = d.clone(),
-                    None => {
-                        eprintln!("--dir necesita un directorio");
-                        return ExitCode::from(2);
-                    }
-                }
-            }
-            "--cores" => {
-                i += 1;
-                match args.get(i).and_then(|c| c.parse::<u32>().ok()) {
-                    Some(c) => opts.cores = c,
-                    None => {
-                        eprintln!("--cores necesita un numero");
-                        return ExitCode::from(2);
-                    }
-                }
-            }
-            otro => {
-                eprintln!("opcion desconocida para install: {otro}");
-                return ExitCode::from(2);
-            }
-        }
-        i += 1;
-    }
-
-    // la contraseña de RCON, si está habilitado y vacía, se genera aquí: el server
-    // no puede arrancar con RCON y sin contraseña (`ensureRconPassword`)
-    if cfg.rcon.enabled && cfg.rcon.password.is_empty() {
-        cfg.rcon.password = doctor::password_aleatorio();
-    }
 
     if let Err(e) = apply::apply_config(&mut cfg, &opts, &mut |l| println!("{l}")) {
         eprintln!("{e}");
         return ExitCode::FAILURE;
     }
 
-    // 4) pregeneracion opcional via RCON + Chunky
-    if pregen && cfg.pregen_radius > 0 {
+    // 4) pregeneracion opcional via RCON + Chunky (no va por defecto: arranca un
+    // server y espera a `Done`, hasta 20 minutos)
+    if a.pregen.unwrap_or(0) > 0 && !a.no_pregen {
         let dir = resolver(&cfg.server_dir);
         let (plan, _) = match forge_api::plan::build_download_plan(&cfg) {
             Ok(p) => p,
@@ -389,74 +346,29 @@ fn install_cmd(args: &[String]) -> ExitCode {
     }
     ExitCode::SUCCESS
 }
-
-/// `forge generate <config.json> [--dir D] [--zip Z] [--cores N]`.
-///
-/// Resuelve el plan, genera el proyecto y lo escribe. Con `--zip` además lo
-/// empaqueta para llevarlo a otra máquina. Es el `openblock generate` del TS, pero
-/// dirigido por el fichero de config: la superficie de flags del modo avanzado
-/// (`--engine`, `--ram-mb`, `--custom`…) todavía no está portada.
 fn generate_cmd(args: &[String]) -> ExitCode {
-    if args.is_empty() {
-        eprintln!("uso: forge generate <config.json> [--dir D] [--zip salida.zip] [--cores N]");
-        return ExitCode::from(2);
-    }
-    let cfg_txt = match fs::read_to_string(&args[0]) {
-        Ok(t) => t,
+    let a = match advanced::parse_avanzados(args) {
+        Ok(a) => a,
         Err(e) => {
-            eprintln!("No se pudo leer {}: {e}", args[0]);
-            return ExitCode::FAILURE;
+            eprintln!("{e}");
+            return ExitCode::from(2);
         }
     };
-    let mut cfg: forge_core::ServerConfig = match serde_json::from_str(&cfg_txt) {
+    if a.help {
+        return uso();
+    }
+    let cfg = match advanced::construir_config(&a) {
         Ok(c) => c,
         Err(e) => {
-            eprintln!("{} no es una config válida: {e}", args[0]);
+            eprintln!("{e}");
             return ExitCode::FAILURE;
         }
     };
-    let mut dir: Option<String> = None;
-    let mut zip_salida: Option<String> = None;
-    let mut cores = num_cpus();
-    let mut i = 1;
-    while i < args.len() {
-        match args[i].as_str() {
-            "--dir" => {
-                i += 1;
-                dir = args.get(i).cloned();
-                if dir.is_none() {
-                    eprintln!("--dir necesita un directorio");
-                    return ExitCode::from(2);
-                }
-            }
-            "--zip" => {
-                i += 1;
-                zip_salida = args.get(i).cloned();
-                if zip_salida.is_none() {
-                    eprintln!("--zip necesita un fichero de salida");
-                    return ExitCode::from(2);
-                }
-            }
-            "--cores" => {
-                i += 1;
-                match args.get(i).and_then(|c| c.parse::<u32>().ok()) {
-                    Some(c) => cores = c,
-                    None => {
-                        eprintln!("--cores necesita un número");
-                        return ExitCode::from(2);
-                    }
-                }
-            }
-            otro => {
-                eprintln!("opción desconocida para generate: {otro}");
-                return ExitCode::from(2);
-            }
-        }
-        i += 1;
-    }
-    if let Some(d) = dir {
-        cfg.server_dir = d;
-    }
+
+    // `--zip` y `--cores` los lee el parser de flags del modo avanzado, que los
+    // conoce; aquí solo se usan
+    let zip_salida = a.zip.clone();
+    let cores = a.cores.unwrap_or_else(num_cpus);
 
     let (plan, avisos) = match forge_api::plan::build_download_plan(&cfg) {
         Ok(p) => p,
@@ -469,8 +381,8 @@ fn generate_cmd(args: &[String]) -> ExitCode {
     for e in &plan.entries {
         println!("  [{}] {}", e.kind.as_str(), e.label);
     }
-    for a in &avisos {
-        eprintln!("{}", a.0);
+    for aviso in &avisos {
+        eprintln!("{}", aviso.0);
     }
 
     let files = forge_core::generators::generate_project(&cfg, &plan, cores);
