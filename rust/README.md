@@ -42,7 +42,8 @@ vigila al otro lado. `forge-api` es el único que hace red, igual que en el TS s
 | `modrinth` (parsers de modpack) | portado |
 | `api::engines` y el cliente de Modrinth | pendiente |
 | `plan` (resolver el manifiesto) | pendiente |
-| doctor | pendiente |
+| `doctor` (aritmética: score, nota, dedupe) | portado |
+| `doctor` (reglas, boot, arreglos) | pendiente |
 | CLI | `detect`, `dump` y `latest` funcionan |
 
 **El núcleo generador está completo y con paridad byte a byte**: los 23 ficheros
@@ -155,7 +156,7 @@ Deliberadas y anotadas, como la lista que DistroForge mantiene en su
 |---|---|---|---|
 | `src/api/engines.ts` | 237 | `forge-api` | resuelve URLs de PaperMC/Fabric/Forge contra sus APIs |
 | `src/plan.ts` | 215 | `forge-api` (resolver) + núcleo (modelo, ya portado) | convierte config en manifiesto de descargas |
-| `src/doctor.ts` | 629 | `forge-cli` | 16 reglas, boot test, fixes y score; necesita red, disco y RCON |
+| `src/doctor.ts` | 629 | `forge-cli` (la aritmética ya está en el núcleo) | 16 reglas, boot test y fixes; necesita red, disco y RCON |
 | `src/apply.ts`, `java.ts` | 360 | `forge-cli` | escritura, descargas, JDK |
 | `src/advanced.ts`, `guided.ts`, `index.ts` | 729 | `forge-cli` | la CLI completa |
 
