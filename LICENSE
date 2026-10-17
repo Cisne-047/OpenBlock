@@ -1,0 +1,37 @@
+MIT License
+
+Copyright (c) 2026 OpenBlock
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+---
+
+## Excepción: identidad del proyecto
+
+El banner ASCII de OpenBlock (`src/ui.ts`) y el nombre **OpenBlock** no quedan
+cubiertos por la licencia MIT anterior: son la identidad del proyecto y no se
+autoriza su uso para identificar otros proyectos ni productos derivados.
+
+OpenBlock no está afiliado a Mojang Studios ni a Microsoft. *Minecraft* es una
+marca registrada de Mojang Studios; este proyecto solo descarga y configura
+software de servidor publicado por terceros (PaperMC, Purpur, Fabric, Forge,
+NeoForge, Modrinth, CurseForge, Eclipse Temurin) bajo sus propias licencias.
+
+El código de terceros empaquetado mantiene su propia licencia; en particular,
+`jszip` se distribuye bajo licencia MIT (https://github.com/Stuk/jszip).

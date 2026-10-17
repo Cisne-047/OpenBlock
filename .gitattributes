@@ -1,0 +1,15 @@
+# Auto detect text files and perform LF normalization
+* text=auto
+
+# Scripts generados: siempre LF, nunca CRLF (rompen el shebang en Linux)
+*.sh text eol=lf
+*.timer text eol=lf
+*.service text eol=lf
+
+# En Windows se generan aparte con CRLF
+*.ps1 text eol=crlf
+*.bat text eol=crlf
+
+*.jar binary
+*.zip binary
+*.mrpack binary

@@ -1,0 +1,21 @@
+{
+  "name": "openblock",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "OpenBlock — forja servidores de Minecraft según tu hardware. Detección + tuning automático en Windows y Linux.",
+  "scripts": {
+    "openblock": "tsx src/index.ts",
+    "build": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "jszip": "^3.10.1"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "tsx": "^4.19.0",
+    "typescript": "~5.6.2",
+    "vitest": "^2.1.9"
+  }
+}

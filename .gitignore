@@ -1,0 +1,15 @@
+node_modules/
+dist/
+coverage/
+*.log
+
+# Proyecto generado en local (generate/advanced sin --dir apuntando fuera)
+openblock-work/
+
+# Nunca versionar credenciales de RCON, EULA ni mundos generados
+server/
+openblock-server/
+
+.env
+.env.*
+!.env.example
