@@ -52,7 +52,9 @@ vigila al otro lado. `forge-api` es el único que hace red, igual que en el TS s
 | `doctor` (los 12 fixes) | portado: informa, arregla y arranca el server |
 | `net::downloadTo` (descarga con hash y reintento) | portado, con servidor falso en los tests |
 | `java::ensureJava` (JDK del sistema o Temurin) | portado; ver la nota de abajo |
-| CLI | `detect`, `plan`, `dump`, `doctor`, `latest` y `rcon` funcionan |
+| `apply` (`install`: proyecto + java + descargas + installer) | portado y comparado con el TS |
+| `apply` (`pregenerate`, `stopServer`, `runBackup`, `extractCfOverrides`) | pendiente |
+| CLI | `detect`, `plan`, `dump`, `install`, `doctor`, `latest` y `rcon` funcionan |
 
 **El núcleo generador está completo y con paridad byte a byte**: los 23 ficheros
 del proyecto salen idénticos al TypeScript, `openblock.json` incluido. Los tiers
@@ -173,6 +175,26 @@ la lectura de la respuesta de Adoptium (con un recorte de la respuesta **real** 
 que se ejecute en una máquina sin JDK; queda anotado como lo que es.
 
 Y `javaBinDir` no se portó: el TS la exporta y **no la usa nadie**.
+
+### `install`, con los dos servers instalados
+
+`apply` se verifica por el resultado, que es lo que el usuario tiene delante:
+
+```bash
+./node_modules/.bin/tsx tests/apply-live.ts tests/fixtures/parity-config.json /tmp/a 16
+cargo run -q -p forge-cli -- install tests/fixtures/parity-config.json --dir /tmp/b --cores 16
+diff -r /tmp/a /tmp/b
+```
+
+Salen **dos servers idénticos**: los 23 ficheros del proyecto, el jar de Paper
+(42 MB), el plugin de Modrinth y el `runtime/java.path`. La única línea que
+difiere es la del `serverDir` dentro de `openblock.json`, y tiene que diferir: cada
+server guarda dónde está. Las `cores` van fijas a 16 en los dos lados porque el TS
+las saca de su detección de hardware y el Rust de `num_cpus`, y ahí no se está
+comparando la detección — eso tiene su propio test.
+
+La pregeneración va apagada en la comparación: arranca el server y lanza Chunky por
+RCON durante 20 minutos.
 
 Lo que la paridad ha cazado, y que ninguna lectura del código habría visto:
 

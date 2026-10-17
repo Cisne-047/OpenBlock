@@ -11,8 +11,9 @@
 //! - `forge dump <config.json> <plan.json> <dir> [cores]` — proyecto a disco.
 //! - `forge doctor [--dir D] [--json]` — diagnostica un server instalado.
 //!
-//! En construcción: el boot test del doctor y los `apply` de sus fixes.
+//! En construcción: la pregeneración de install y el modo guiado.
 
+mod apply;
 mod detect;
 mod doctor;
 mod java;
@@ -30,6 +31,7 @@ fn uso() -> ExitCode {
         "  plan <config> [plan.json]       resuelve el plan contra las APIs (sin -o, a stdout)"
     );
     eprintln!("  dump <config> <plan> <dir> [n]  genera el proyecto desde config y plan");
+    eprintln!("  install <config> [--force]      resuelve el plan y baja todo: server instalado");
     eprintln!("  doctor [--dir D] [--json]       diagnostica un server instalado (solo lectura)");
     eprintln!("  latest                          última release de Minecraft (consulta Mojang)");
     eprintln!("  rcon <host> <puerto> <comando>  manda un comando por RCON (pass: OPENBLOCK_RCON_PASSWORD)");
@@ -41,6 +43,7 @@ fn main() -> ExitCode {
     match args.first().map(String::as_str) {
         Some("detect") => detect_cmd(&args[1..]),
         Some("dump") => dump_cmd(&args[1..]),
+        Some("install") => install_cmd(&args[1..]),
         Some("latest") => latest_cmd(),
         Some("doctor") => doctor_cmd(&args[1..]),
         Some("plan") => plan_cmd(&args[1..]),
@@ -272,8 +275,85 @@ fn doctor_cmd(args: &[String]) -> ExitCode {
     }
 }
 
+/// `forge install <config.json> [--force] [--dry-run]`.
+///
+/// Es el camino completo: resolver el plan, escribir el proyecto, dejar el Java en
+/// `runtime/`, bajar el engine, los plugins y los mods, y ejecutar el installer de
+/// Forge/NeoForge si toca. Lo que falta respecto al TS es la pregeneración, que
+/// arranca el server y lanza Chunky por RCON.
+fn install_cmd(args: &[String]) -> ExitCode {
+    if args.is_empty() {
+        eprintln!("uso: forge install <config.json> [--force] [--dry-run]");
+        return ExitCode::from(2);
+    }
+    let cfg_txt = match fs::read_to_string(&args[0]) {
+        Ok(t) => t,
+        Err(e) => {
+            eprintln!("No se pudo leer {}: {e}", args[0]);
+            return ExitCode::FAILURE;
+        }
+    };
+    let mut cfg: forge_core::ServerConfig = match serde_json::from_str(&cfg_txt) {
+        Ok(c) => c,
+        Err(e) => {
+            eprintln!("{} no es una config válida: {e}", args[0]);
+            return ExitCode::FAILURE;
+        }
+    };
+    let mut opts = apply::OpcionesApply {
+        cores: num_cpus(),
+        ..Default::default()
+    };
+    let mut i = 1;
+    while i < args.len() {
+        match args[i].as_str() {
+            "--force" => opts.force = true,
+            "--dry-run" => opts.dry_run = true,
+            "--dir" => {
+                i += 1;
+                match args.get(i) {
+                    Some(d) => cfg.server_dir = d.clone(),
+                    None => {
+                        eprintln!("--dir necesita un directorio");
+                        return ExitCode::from(2);
+                    }
+                }
+            }
+            "--cores" => {
+                i += 1;
+                match args.get(i).and_then(|c| c.parse::<u32>().ok()) {
+                    Some(c) => opts.cores = c,
+                    None => {
+                        eprintln!("--cores necesita un numero");
+                        return ExitCode::from(2);
+                    }
+                }
+            }
+            otro => {
+                eprintln!("opcion desconocida para install: {otro}");
+                return ExitCode::from(2);
+            }
+        }
+        i += 1;
+    }
+
+    // la contraseña de RCON, si está habilitado y vacía, se genera aquí: el server
+    // no puede arrancar con RCON y sin contraseña (`ensureRconPassword`)
+    if cfg.rcon.enabled && cfg.rcon.password.is_empty() {
+        cfg.rcon.password = doctor::password_aleatorio();
+    }
+
+    match apply::apply_config(&mut cfg, &opts, &mut |l| println!("{l}")) {
+        Ok(()) => ExitCode::SUCCESS,
+        Err(e) => {
+            eprintln!("{e}");
+            ExitCode::FAILURE
+        }
+    }
+}
+
 /// `path.resolve` de Node: absoluta y sin `.`, resolviendo lo relativo contra el cwd.
-fn resolver(p: &str) -> PathBuf {
+pub(crate) fn resolver(p: &str) -> PathBuf {
     let ruta = Path::new(p);
     if ruta.is_absolute() {
         ruta.to_path_buf()
