@@ -164,3 +164,21 @@ fn aplicar_un_fix_que_comparten_dos_reglas_las_arregla_las_dos() {
         "una sola aplicación arregla las dos reglas"
     );
 }
+
+#[test]
+fn el_heap_se_reescribe_con_los_dos_regex() {
+    // el bug que tuvo este fix (un solo regex para -Xms y -Xmx) no da error: da un
+    // arranque con el heap mal y el server se queda sin memoria en produccion
+    let g = golden();
+    let casos = g["heap"].as_array().expect("seccion heap del golden");
+    assert!(casos.len() >= 6);
+    for c in casos {
+        let entrada = c["entrada"].as_str().unwrap();
+        let ram = c["ramMB"].as_u64().unwrap() as u32;
+        assert_eq!(
+            doctor::rewrite_heap_flags(entrada, ram),
+            c["salida"].as_str().unwrap(),
+            "heap de {ram} MB sobre {entrada:?}"
+        );
+    }
+}

@@ -80,6 +80,10 @@ pub struct Finding {
     pub fix_considerable: bool,
     /// Descripción del fix, para el informe.
     pub fix_description: Option<String>,
+    /// Lo que el fix necesita del match y no cabe en la descripción: el nombre del
+    /// plugin que revienta (`PLUGIN_CRASH`) o el Java que pide el server
+    /// (`JAVA_VERSION`). En el TS lo lleva la closure; aquí, el dato.
+    pub fix_arg: Option<String>,
 }
 
 impl Finding {
@@ -93,6 +97,7 @@ impl Finding {
             fix_code: None,
             fix_considerable: false,
             fix_description: None,
+            fix_arg: None,
         }
     }
 
@@ -102,6 +107,7 @@ impl Finding {
             fix_code: Some(fix_code.to_string()),
             fix_considerable: considerable,
             fix_description: Some(format!("descripción de {fix_code}")),
+            fix_arg: None,
             ..Self::new(severity, code)
         }
     }
@@ -198,6 +204,26 @@ pub struct ContextoLog {
     pub view_distance: u32,
 }
 
+// ---------- arreglos ----------
+
+/// Reescribe el heap en un fichero de flags JVM (`rewriteHeapFlags`).
+///
+/// `-Xms` y `-Xmx` van por separado y en ese orden. Antes había un solo
+/// `/-Xm[sx]\d+[MG]/g` que sustituía por `-Xmx` y por tanto **también reescribía
+/// `-Xms`**, dejando muerto el `replace` siguiente y rompiendo en silencio el heap
+/// simétrico que genera `aikarFlags` (`-Xms` igual a `-Xmx`: evita que la JVM
+/// redimensione el heap en caliente). Solo toca las flags que ya existen, que es lo
+/// que pide el fix: subir la RAM asignada, no inventar flags.
+///
+/// Es puro a propósito, para poder comprobarlo sin arrancar un server.
+pub fn rewrite_heap_flags(txt: &str, ram_mb: u32) -> String {
+    let xms = regex::Regex::new(r"-Xms\d+[MG]").expect("patrón constante");
+    let xmx = regex::Regex::new(r"-Xmx\d+[MG]").expect("patrón constante");
+    let paso1 = xms.replace_all(txt, format!("-Xms{ram_mb}M"));
+    xmx.replace_all(&paso1, format!("-Xmx{ram_mb}M"))
+        .to_string()
+}
+
 /// Los grupos capturados del primer match de una regla (`RegExpMatchArray`).
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct Capturas(pub Vec<Option<String>>);
@@ -232,6 +258,17 @@ pub struct LogRule {
     pub pattern: &'static str,
     pub message: &'static str,
     pub fix: Option<FixSpec>,
+}
+
+/// Qué grupo de la captura necesita el fix de una regla, si necesita alguno.
+///
+/// En el TS lo lleva la closure (m[1]); aquí, el dato, porque el pply vive en
+/// el CLI y no puede quedarse con el match.
+pub fn arg_grupo(code: &str) -> Option<usize> {
+    match code {
+        "JAVA_VERSION" | "PLUGIN_CRASH" => Some(1),
+        _ => None,
+    }
 }
 
 /// Las reglas sobre el log, en su orden.
@@ -372,6 +409,10 @@ pub fn evaluar_log(lines: &[String], ctx: &ContextoLog) -> Vec<Finding> {
             fix_code: fix.as_ref().map(|(f, _)| f.code.to_string()),
             fix_considerable: fix.as_ref().is_some_and(|(f, _)| f.considerable),
             fix_description: fix.as_ref().map(|(f, m)| (f.description)(m, ctx)),
+            // el dato que la closure del TS lleva capturado: el Java que pide el
+            // server, el plugin que revienta
+            fix_arg: arg_grupo(rule.code)
+                .and_then(|i| fix.as_ref().map(|(_, m)| m.grupo(i).to_string())),
         });
     }
     out
@@ -524,6 +565,8 @@ fn hallazgo(
         fix_code: fix.as_ref().map(|(c, _, _)| c.to_string()),
         fix_considerable: fix.as_ref().is_some_and(|(_, _, cons)| *cons),
         fix_description: fix.map(|(_, d, _)| d),
+        // las reglas estáticas no capturan nada: su fix sale de la config
+        fix_arg: None,
     }
 }
 

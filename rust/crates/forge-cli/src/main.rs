@@ -161,6 +161,7 @@ fn doctor_cmd(args: &[String]) -> ExitCode {
     let mut dir = ".".to_string();
     let mut json = false;
     let mut boot = false;
+    let mut yes = false;
     let mut i = 0;
     while i < args.len() {
         match args[i].as_str() {
@@ -168,6 +169,9 @@ fn doctor_cmd(args: &[String]) -> ExitCode {
             // el TS arranca el server por defecto; aquí hay que pedirlo, porque el
             // boot test lanza un server de verdad y tarda minutos
             "--boot" => boot = true,
+            // sin TTY no hay confirmación, así que `--yes` es «aplica lo seguro»,
+            // exactamente igual que en el TS
+            "--yes" => yes = true,
             "--dir" => {
                 i += 1;
                 match args.get(i) {
@@ -211,14 +215,17 @@ fn doctor_cmd(args: &[String]) -> ExitCode {
     }
 
     let donde = PathBuf::from(&cfg.server_dir);
-    let mut lineas: Vec<String> = Vec::new();
-    let boot_ok = if boot {
-        eprintln!("== Dry run: arrancando el server en modo test ==");
-        doctor::boot_test(&cfg, &donde, &mut |l| lineas.push(l))
+    // `doctorMode` del TS: `readOnly = json || (!tty && !yes)`. Como aquí no hay
+    // TTY, el doctor solo escribe si se pide con `--yes`.
+    let modo = if yes && !json {
+        doctor::Modo::Aplicar
     } else {
-        false
+        doctor::Modo::SoloLectura
     };
-    let informe = doctor::doctor_readonly(&cfg, &donde, &lineas, (boot, boot_ok));
+    if boot {
+        eprintln!("== Dry run: arrancando el server en modo test ==");
+    }
+    let informe = doctor::ejecutar(&mut cfg, &donde, boot, modo);
 
     if json {
         match serde_json::to_string_pretty(&informe) {

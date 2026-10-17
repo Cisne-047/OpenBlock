@@ -49,7 +49,7 @@ vigila al otro lado. `forge-api` es el único que hace red, igual que en el TS s
 | `doctor` (reglas estáticas) | portado, con la vista y los hechos inyectados |
 | `doctor` (informe, `forge doctor --json`) | portado y comparado con el TS en vivo |
 | `doctor` (boot test) | portado: arranca, captura el log y apaga por RCON |
-| `doctor` (los 12 `apply` de los fixes) | pendiente |
+| `doctor` (9 de los 12 fixes) | portado; faltan `install-java` ×2 y `update-plugin` |
 | CLI | `detect`, `plan`, `dump`, `latest` y `rcon` funcionan |
 
 **El núcleo generador está completo y con paridad byte a byte**: los 23 ficheros
@@ -139,6 +139,14 @@ sale además un hallazgo de verdad —`TICK_BEHIND`, con la descripción
 Que los dos coincidan en un log de 2600 líneas de Paper es la prueba de que la
 captura por stdout/stderr y por la cola del log hace lo mismo en los dos lados.
 
+Y los **fixes** se verifican por el resultado, que es lo que le importa al usuario:
+dos copias idénticas de un server roto, `doctor --yes --no-boot` en el TS y
+`doctor --yes` en Rust, y después **todos los ficheros comparados hash a hash**.
+Salen idénticos: `eula.txt`, el `server.properties` parcheado conservando sus
+finales CRLF, y el `openblock.json` reescrito. El escenario lleva la contraseña
+RCON larga a propósito: ese fix genera una contraseña aleatoria y no puede
+compararse por el valor (solo por la forma, que sí tiene su test).
+
 Lo que la paridad ha cazado, y que ninguna lectura del código habría visto:
 
 - **Los acrónimos de serde**: `ram_mb` sale `ramMb` y el JSON dice `ramMB`;
@@ -155,6 +163,14 @@ Lo que la paridad ha cazado, y que ninguna lectura del código habría visto:
   doctor habría dicho «falta el jar del engine» en **todos** los proyectos
   generados en Windows. Lo cazó el test del propio port, no el golden: el golden
   escribe los fixtures con LF.
+- **La clave de `patchProperties` va sin escapar, y renombra líneas.** El TS hace
+  `new RegExp(\`^${k}=.*$\`, "m")` con `k = "query.port"`: el punto es un comodín,
+  así que la expresión casa con `queryXport=9`… y como el reemplazo escribe la
+  clave buena, esa línea acaba **renombrada** a `query.port=25566`. Comprobado
+  ejecutando el JS de verdad (`node -e` con el mismo `new RegExp`), no de memoria.
+  En Rust, además, el `.*` hay que escribirlo `[^\r\n]*`: el `.` de JS no cruza el
+  `\r` y el de Rust sí, y de eso depende que un `server.properties` con finales
+  CRLF los conserve al parchearlo.
 - **El boot test solo funciona en el primer arranque de un directorio.** `antes` es
   el tamaño del log anterior y la cola se lee desde ahí, pero Paper **rota**
   `latest.log` al arrancar: el fichero nuevo es más corto, la cola sale vacía, no

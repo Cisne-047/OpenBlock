@@ -474,5 +474,47 @@
       "considerable": false,
       "etiqueta": "Poner sync-chunk-writes=false (automático)"
     }
+  ],
+  "heap": [
+    {
+      "entrada": "-Xms8192M\n-Xmx8192M\n-XX:+UseG1GC\n-XX:MaxGCPauseMillis=200",
+      "ramMB": 12288,
+      "salida": "-Xms12288M\n-Xmx12288M\n-XX:+UseG1GC\n-XX:MaxGCPauseMillis=200"
+    },
+    {
+      "entrada": "-Xmx2G -Xms2G",
+      "ramMB": 4096,
+      "salida": "-Xmx4096M -Xms4096M"
+    },
+    {
+      "entrada": "-Xmx512M",
+      "ramMB": 1024,
+      "salida": "-Xmx1024M"
+    },
+    {
+      "entrada": "sin flags de heap",
+      "ramMB": 2048,
+      "salida": "sin flags de heap"
+    },
+    {
+      "entrada": "-Xmx8G",
+      "ramMB": 16,
+      "salida": "-Xmx16M"
+    },
+    {
+      "entrada": "-Xmx99999999999M",
+      "ramMB": 1,
+      "salida": "-Xmx1M"
+    },
+    {
+      "entrada": "",
+      "ramMB": 4096,
+      "salida": ""
+    },
+    {
+      "entrada": "-XX:+UseZGC\n-Xmx3G\n-Xms3G\n",
+      "ramMB": 6144,
+      "salida": "-XX:+UseZGC\n-Xmx6144M\n-Xms6144M\n"
+    }
   ]
 }

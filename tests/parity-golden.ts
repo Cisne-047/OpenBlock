@@ -54,7 +54,7 @@ import {
   quiltLoaderVersionsFrom,
 } from "../src/api/engines.js";
 import { planFor } from "./helpers.js";
-import { evaluateLogRules, evaluateStaticRules, LOG_RULES } from "../src/doctor.js";
+import { evaluateLogRules, evaluateStaticRules, LOG_RULES, rewriteHeapFlags } from "../src/doctor.js";
 import type { DoctorContext, Finding } from "../src/doctor.js";import type { HardwareProfile, ServerConfig } from "../src/types.js";
 
 const raiz = join(fileURLToPath(new URL(".", import.meta.url)), "..");
@@ -464,8 +464,7 @@ const doctorGolden = {
     return { entrada: conDuplicados, salida: unicos };
   })(),
   // la etiqueta de un fix no aplicado: los automáticos llevan sufijo
-  etiquetas: [
-    { descripcion: "Aceptar EULA (eula=true)", considerable: false },
+  etiquetas: [    { descripcion: "Aceptar EULA (eula=true)", considerable: false },
     { descripcion: "Cambiar el puerto", considerable: true },
     { descripcion: "Subir la RAM", considerable: true },
     { descripcion: "Poner sync-chunk-writes=false", considerable: false },
@@ -474,6 +473,23 @@ const doctorGolden = {
     considerable,
     etiqueta: considerable ? descripcion : `${descripcion} (automático)`,
   })),
+  // el fix de la RAM reescribe el heap de los flags JVM. Se compara el texto
+  // entero porque el bug que tuvo (un solo regex para -Xms y -Xmx) no da error:
+  // da un arranque con el heap mal y el server se queda sin memoria en producción.
+  heap: (() => {
+    const aikar = ["-Xms8192M", "-Xmx8192M", "-XX:+UseG1GC", "-XX:MaxGCPauseMillis=200"].join("\n");
+    const casos: Array<{ entrada: string; ramMB: number }> = [
+      { entrada: aikar, ramMB: 12288 },
+      { entrada: "-Xmx2G -Xms2G", ramMB: 4096 },
+      { entrada: "-Xmx512M", ramMB: 1024 },
+      { entrada: "sin flags de heap", ramMB: 2048 },
+      { entrada: "-Xmx8G", ramMB: 16 },
+      { entrada: "-Xmx99999999999M", ramMB: 1 },
+      { entrada: "", ramMB: 4096 },
+      { entrada: "-XX:+UseZGC\n-Xmx3G\n-Xms3G\n", ramMB: 6144 },
+    ];
+    return casos.map((c) => ({ ...c, salida: rewriteHeapFlags(c.entrada, c.ramMB) }));
+  })(),
 };
 writeFileSync(join(golden, "doctor.json"), JSON.stringify(doctorGolden, null, 2) + "\n", "utf8");
 
