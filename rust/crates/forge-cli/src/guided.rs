@@ -165,13 +165,16 @@ pub fn guided() -> Result<(), String> {
         "facil",
     )?;
 
+    // --- el modpack: se resuelve ANTES de preguntar lo demás, porque de aquí salen
+    // la versión de MC y el loader ---
     let engine: EngineId;
     let mc_version: String;
-    let modpack = ModpackRef {
+    let mut build: Option<String> = None;
+    let mut modpack = ModpackRef {
         kind: ModpackKind::None,
         url: String::new(),
     };
-    let mut build: Option<String> = None;
+    let mut cf_zip: Option<String> = None;
 
     match modo.as_str() {
         "facil" => {
@@ -230,10 +233,89 @@ pub fn guided() -> Result<(), String> {
             build = elegir_build(engine, &mc_version)?;
         }
         "modpack" => {
-            return Err(
-                "El modpack del modo guiado todavía no está portado: usa `forge generate --modpack <url>` o el CLI de TypeScript."
-                    .to_string(),
-            );
+            let origen = ask_choice(
+                "Origen del modpack",
+                &[
+                    ("modrinth", "Modrinth (URL)", "descarga automática completa"),
+                    (
+                        "curseforge",
+                        "CurseForge (zip exportado)",
+                        "mods necesitan API key; overrides sí se copian",
+                    ),
+                ],
+                "modrinth",
+            )?;
+            if origen == "modrinth" {
+                let url = ask("URL del modpack (modrinth.com/modpack/...)", "")?;
+                if url.is_empty() {
+                    return Err("sin URL no hay modpack".to_string());
+                }
+                println!("  Resolviendo modpack...");
+                // baja el .mrpack y lee su índice: es lo que da la versión de MC y el
+                // loader, en vez de preguntarlos
+                let index = forge_api::modrinth::mrpack_index(&url).map_err(|e| e.to_string())?;
+                mc_version = index
+                    .dependencies
+                    .get("minecraft")
+                    .cloned()
+                    .ok_or_else(|| "el modpack no dice qué versión de MC usa".to_string())?;
+                // ojo: el TS busca la primera clave que no sea `minecraft` en el orden
+                // de inserción del JSON, y aquí las dependencias son un `BTreeMap`
+                // (ordenadas). Un modpack real trae una sola dependencia de loader, así
+                // que la respuesta es la misma; con dos, podría no serlo.
+                let loader_dep = index
+                    .dependencies
+                    .keys()
+                    .find(|k| k.as_str() != "minecraft")
+                    .cloned()
+                    .unwrap_or_default();
+                engine = match loader_dep.as_str() {
+                    "fabric-loader" => EngineId::Fabric,
+                    "quilt-loader" => EngineId::Quilt,
+                    "neoforge" => EngineId::Neoforge,
+                    _ => EngineId::Forge,
+                };
+                modpack = ModpackRef {
+                    kind: ModpackKind::Modrinth,
+                    url,
+                };
+                println!(
+                    "  → {} {}: MC {mc_version}, loader {}",
+                    index.name,
+                    index.version_id,
+                    if loader_dep.is_empty() {
+                        "?"
+                    } else {
+                        loader_dep.as_str()
+                    }
+                );
+            } else {
+                let zip = ask("Ruta del zip exportado de CurseForge", "")?;
+                if !std::path::Path::new(&zip).exists() {
+                    return Err(format!("No existe {zip}"));
+                }
+                let manifest = crate::apply::cf_manifest_de_zip(&zip)?;
+                let manifest = forge_core::modrinth::parse_cf_manifest(&manifest)
+                    .map_err(|e| e.to_string())?;
+                let loader = forge_core::modrinth::cf_loader_kind(&manifest);
+                mc_version = manifest.minecraft.version.clone();
+                engine = match loader.as_ref().map(|(e, _)| *e) {
+                    Some("neoforge") => EngineId::Neoforge,
+                    Some(_) => EngineId::Forge,
+                    None => EngineId::Forge,
+                };
+                modpack = ModpackRef {
+                    kind: ModpackKind::Curseforge,
+                    url: zip.clone(),
+                };
+                cf_zip = Some(zip);
+                println!(
+                    "  → {}: MC {mc_version}, loader {} {}",
+                    manifest.name,
+                    loader.as_ref().map(|(e, _)| *e).unwrap_or("?"),
+                    loader.map(|(_, b)| b).unwrap_or_default()
+                );
+            }
         }
         otro => return Err(format!("modo desconocido: {otro}")),
     }
@@ -461,6 +543,22 @@ pub fn guided() -> Result<(), String> {
         cores: hw.cores,
         ..Default::default()
     };
+
+    // un modpack de CurseForge: primero se instala el server y luego se copian los
+    // overrides, que pueden traer configs que el server necesita. Los mods no se
+    // bajan: el manifest pide la API de CurseForge y sin key no hay descarga
+    if cfg.modpack.kind == ModpackKind::Curseforge {
+        if let Some(zip) = &cf_zip {
+            crate::apply::apply_config(&mut cfg, &opts, &mut |l| println!("{l}"))?;
+            crate::apply::extract_cf_overrides(zip, &crate::resolver(&cfg.server_dir), &mut |s| {
+                println!("{s}")
+            })?;
+            println!(
+                "\nModpack CurseForge: los mods no se bajan sin API key. Instala el modpack con el launcher y copia mods/, o exporta OPENBLOCK_CF_KEY y reintenta."
+            );
+            return Ok(());
+        }
+    }
     crate::apply::apply_config(&mut cfg, &opts, &mut |l| println!("{l}"))?;
     if cfg.pregen_radius > 0 {
         let dir = crate::resolver(&cfg.server_dir);

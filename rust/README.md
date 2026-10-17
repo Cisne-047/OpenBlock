@@ -42,7 +42,7 @@ vigila al otro lado. `forge-api` es el único que hace red, igual que en el TS s
 | `modrinth` (parsers de modpack) | portado |
 | `api::engines` | portado (con `url` y `js` de apoyo) |
 | cliente de Modrinth | portado: query, primera versión y fichero primario |
-| `.mrpack` (zip) | pendiente: hace falta leer el zip, no solo el índice |
+| `.mrpack` (zip) | portado: se lee el índice del zip y los overrides del de CurseForge |
 | `plan` (resolver el manifiesto) | pendiente |
 | `doctor` (aritmética: score, nota, dedupe) | portado |
 | `doctor` (reglas de log) | portado, con sus descripciones |
@@ -59,9 +59,9 @@ vigila al otro lado. `forge-api` es el único que hace red, igual que en el TS s
 | `output::zipProject` (el zip portable) | portado y comparado: mismas entradas y mismo contenido |
 | `advanced` (las flags y la config) | portado: flag > config previa > hardware |
 | `hw::bench` (la medida, no solo la fórmula) | portado, con una divergencia que se explica |
-| `guided` (el asistente) | portado, salvo la rama del modpack |
+| `guided` (el asistente) | portado entero, modpack incluido |
 | CLI | `detect`, `bench`, `plan`, `dump`, `install`, `generate`, `info`, `guided`, `doctor`, `backup`, `stop`, `self-test`, `latest`, `rcon` y `help` |
-| **falta** | la rama de modpack del asistente (`fetchMrpack` y el zip de CurseForge) |
+| **falta** | decidir cómo se instala el binario sin tener Rust |
 
 **El núcleo generador está completo y con paridad byte a byte**: los 23 ficheros
 del proyecto salen idénticos al TypeScript, `openblock.json` incluido. Los tiers

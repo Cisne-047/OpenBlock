@@ -491,6 +491,68 @@ pub fn zip_project(files: &FileMap) -> Result<Vec<u8>, String> {
     Ok(buf)
 }
 
+// ---------- modpacks: el zip de CurseForge ----------
+
+/// Lee `manifest.json` de un zip exportado de CurseForge.
+///
+/// El launcher exporta el modpack como un zip con `manifest.json` en la raíz y los
+/// `overrides/` al lado. Aquí solo se saca el manifest, que es de donde salen la
+/// versión de MC y el loader.
+pub fn cf_manifest_de_zip(zip_path: &str) -> Result<String, String> {
+    use std::io::Read;
+
+    let bytes = std::fs::read(zip_path).map_err(|e| format!("{zip_path}: {e}"))?;
+    let mut zip = zip::ZipArchive::new(std::io::Cursor::new(bytes))
+        .map_err(|e| format!("{zip_path}: zip ilegible: {e}"))?;
+    let mut entrada = zip.by_name("manifest.json").map_err(|_| {
+        format!("{zip_path} no es un modpack exportado de CurseForge: no tiene manifest.json")
+    })?;
+    let mut txt = String::new();
+    entrada
+        .read_to_string(&mut txt)
+        .map_err(|e| format!("{zip_path}: manifest.json ilegible: {e}"))?;
+    Ok(txt)
+}
+
+/// Copia los `overrides/` de un modpack CurseForge exportado (`extractCfOverrides`).
+///
+/// Los mods del manifest no se pueden bajar sin API key, así que solo se copian los
+/// overrides —que traen las configs que el server necesita— y se deja un
+/// `CF-PENDING.txt` diciéndolo.
+pub fn extract_cf_overrides(
+    zip_path: &str,
+    dir: &Path,
+    log: &mut dyn FnMut(String),
+) -> Result<(), String> {
+    let bytes = std::fs::read(zip_path).map_err(|e| format!("{zip_path}: {e}"))?;
+    let mut zip = zip::ZipArchive::new(std::io::Cursor::new(bytes))
+        .map_err(|e| format!("{zip_path}: zip ilegible: {e}"))?;
+    const PREFIJO: &str = "overrides/";
+    let mut count = 0usize;
+    for i in 0..zip.len() {
+        let mut f = zip.by_index(i).map_err(|e| e.to_string())?;
+        let nombre = f.name().to_string();
+        if !nombre.starts_with(PREFIJO) || f.is_dir() {
+            continue;
+        }
+        let destino = dir.join(&nombre[PREFIJO.len()..]);
+        if let Some(padre) = destino.parent() {
+            std::fs::create_dir_all(padre).map_err(|e| e.to_string())?;
+        }
+        let mut salida = std::fs::File::create(&destino).map_err(|e| e.to_string())?;
+        std::io::copy(&mut f, &mut salida).map_err(|e| e.to_string())?;
+        count += 1;
+    }
+    log(format!(
+        "✓ {count} ficheros de overrides copiados del modpack"
+    ));
+    let _ = std::fs::write(
+        dir.join("CF-PENDING.txt"),
+        "Los mods del manifest requieren OPENBLOCK_CF_KEY o instalación manual.\n",
+    );
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -552,5 +614,82 @@ mod tests {
             !std::path::Path::new(&cfg.server_dir).exists(),
             "no debe escribir nada"
         );
+    }
+}
+
+#[cfg(test)]
+mod tests_del_modpack {
+    use super::*;
+
+    /// Un zip con las entradas que se le pasen, como el que exporta el launcher.
+    fn zip_con(entradas: &[(&str, &str)]) -> std::path::PathBuf {
+        use std::io::Write;
+        let ruta = std::env::temp_dir().join(format!(
+            "openblock-cf-{}-{}.zip",
+            std::process::id(),
+            entradas.len()
+        ));
+        let mut buf = Vec::new();
+        {
+            let mut w = zip::write::ZipWriter::new(std::io::Cursor::new(&mut buf));
+            let opciones = zip::write::SimpleFileOptions::default();
+            for (nombre, contenido) in entradas {
+                w.start_file(*nombre, opciones).unwrap();
+                w.write_all(contenido.as_bytes()).unwrap();
+            }
+            w.finish().unwrap();
+        }
+        std::fs::write(&ruta, buf).unwrap();
+        ruta
+    }
+
+    #[test]
+    fn saca_el_manifest_y_los_overrides_de_un_zip_de_curseforge() {
+        let manifest = r#"{"minecraft":{"version":"1.20.1","modLoaders":[{"id":"forge-47.2.0","primary":true}]},"manifestType":"minecraftModpack","manifestVersion":1,"name":"Mi Pack","files":[],"overrides":"overrides"}"#;
+        let zip = zip_con(&[
+            ("manifest.json", manifest),
+            ("overrides/config/x.txt", "ajuste"),
+            ("overrides/sub/y.txt", "otro"),
+            ("otra-cosa.txt", "no"),
+        ]);
+
+        let leido = cf_manifest_de_zip(&zip.to_string_lossy()).expect("manifest");
+        let m = forge_core::modrinth::parse_cf_manifest(&leido).expect("manifest válido");
+        assert_eq!(m.minecraft.version, "1.20.1");
+        let (engine, build) = forge_core::modrinth::cf_loader_kind(&m).expect("forge");
+        assert_eq!(engine, "forge");
+        assert_eq!(build, "47.2.0");
+
+        // y los overrides se copian sin el prefijo, mas el CF-PENDING
+        let dir = std::env::temp_dir().join(format!("openblock-cf-dir-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let mut lineas = Vec::new();
+        extract_cf_overrides(&zip.to_string_lossy(), &dir, &mut |l| lineas.push(l)).unwrap();
+        assert_eq!(
+            std::fs::read_to_string(dir.join("config/x.txt")).unwrap(),
+            "ajuste"
+        );
+        assert_eq!(
+            std::fs::read_to_string(dir.join("sub/y.txt")).unwrap(),
+            "otro"
+        );
+        assert!(
+            !dir.join("otra-cosa.txt").exists(),
+            "solo se copia overrides/"
+        );
+        assert!(dir.join("CF-PENDING.txt").exists());
+        assert!(lineas[0].contains("2 ficheros de overrides"));
+
+        let _ = std::fs::remove_dir_all(&dir);
+        let _ = std::fs::remove_file(&zip);
+    }
+
+    #[test]
+    fn un_zip_sin_manifest_no_es_un_modpack_de_curseforge() {
+        let zip = zip_con(&[("leeme.txt", "hola")]);
+        let err = cf_manifest_de_zip(&zip.to_string_lossy()).expect_err("sin manifest");
+        assert!(err.contains("no tiene manifest.json"), "{err}");
+        let _ = std::fs::remove_file(&zip);
     }
 }
