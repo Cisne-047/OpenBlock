@@ -4,6 +4,14 @@
   "version": "0.1.0",
   "type": "module",
   "description": "OpenBlock — forja servidores de Minecraft según tu hardware. Detección + tuning automático en Windows y Linux.",
+  "license": "MIT",
+  "engines": {
+    "node": ">=20"
+  },
+  "os": [
+    "win32",
+    "linux"
+  ],
   "scripts": {
     "openblock": "tsx src/index.ts",
     "build": "tsc --noEmit",

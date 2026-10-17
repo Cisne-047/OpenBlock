@@ -1,6 +1,11 @@
 # OpenBlock
 
-**Forja servidores de Minecraft según tu hardware.** Hermano de [DistroForge](https://github.com/cisne-047/DistroForge) (que forja distros Linux): OpenBlock forja servidores de MC. Detecta tu máquina (Windows/Linux), elige engine, build exacta, RAM, GC, distancias y plugins/mods de rendimiento, instala todo y **deja el server arrancable con un script**. Y cuando está listo, el **Doctor** hace un dry run: cuenta errores y warnings, arregla lo seguro y te pregunta antes de tocar nada considerable.
+**Forja servidores de Minecraft según tu hardware.** Hermano de [DistroForge](https://github.com/cisne-047/DistroForge) (que forja distros Linux): OpenBlock forja servidores de MC.
+
+- **Requiere**: Node.js 20 o superior, en Windows o Linux
+- **Historial de cambios**: [CHANGELOG.md](CHANGELOG.md)
+- **Licencia**: MIT para el código; el banner y el nombre quedan fuera ([LICENSE](LICENSE))
+- **Estado**: v0.1.0 sin etiquetar, en desarrollo — el repositorio es privado por ahora Detecta tu máquina (Windows/Linux), elige engine, build exacta, RAM, GC, distancias y plugins/mods de rendimiento, instala todo y **deja el server arrancable con un script**. Y cuando está listo, el **Doctor** hace un dry run: cuenta errores y warnings, arregla lo seguro y te pregunta antes de tocar nada considerable.
 
 Misma arquitectura que DistroForge: TypeScript ESM + generadores puros (`FileMap`), proyecto con `openblock.json` de round-trip, zip portable, vitest. Presentación estilo Minecraft (splash texts, logros, barras de cofre).
 
