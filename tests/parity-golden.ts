@@ -389,7 +389,62 @@ const entradas: Record<string, string> = {
 };
 writeFileSync(join(golden, "modpack-entradas.json"), JSON.stringify(entradas, null, 2) + "\n", "utf8");
 
+// Doctor: la aritmética del score. Es lo que un puerto puede romper en silencio —
+// un score mal calculado no da error, da un informe que miente sobre el estado del
+// server—, así que se compara con las combinaciones que tocan los cortes de nota.
+//
+// La fórmula replica `runDoctor` de `src/doctor.ts:601-604`:
+//   Math.max(0, 100 - errors*20 - warnings*5)
+//   score >= 90 ? "SANO" : >= 70 ? "OK CON AVISOS" : >= 40 ? "NECESITA ATENCIÓN" : "CRÍTICO"
+// Se repite aquí en vez de exportarla porque no merece una API pública en el fuente.
+const scoreDoctor = (errors: number, warnings: number, infos: number) => {
+  const score = Math.max(0, 100 - errors * 20 - warnings * 5);
+  const grade = score >= 90 ? "SANO" : score >= 70 ? "OK CON AVISOS" : score >= 40 ? "NECESITA ATENCIÓN" : "CRÍTICO";
+  return { errors, warnings, infos, score, grade };
+};
+
+const doctorGolden = {
+  // todas las combinaciones que tocan los cortes de nota y sus alrededores
+  scores: (() => {
+    const casos: Array<{ errors: number; warnings: number; infos: number }> = [];
+    for (let errors = 0; errors <= 6; errors++) {
+      for (let warnings = 0; warnings <= 6; warnings++) {
+        casos.push({ errors, warnings, infos: errors + warnings });
+      }
+    }
+    // y los bordes exactos de los cortes, con solo warnings
+    for (const w of [0, 1, 2, 3, 5, 6, 10, 12, 20]) casos.push({ errors: 0, warnings: w, infos: 0 });
+    return casos.map((c) => scoreDoctor(c.errors, c.warnings, c.infos));
+  })(),
+  // dedupe: gana el primero por código y se conserva el orden
+  dedupe: (() => {
+    const conDuplicados = [
+      { severity: "error", code: "EULA_FILE" },
+      { severity: "warning", code: "SYNC_CHUNK_WRITES" },
+      { severity: "error", code: "EULA_FILE" },
+      { severity: "info", code: "PLUGIN_UPDATE" },
+      { severity: "warning", code: "SYNC_CHUNK_WRITES" },
+      { severity: "error", code: "ENGINE_JAR_MISSING" },
+    ];
+    const vistos = new Set<string>();
+    const unicos = conDuplicados.filter((f) => (vistos.has(f.code) ? false : (vistos.add(f.code), true)));
+    return { entrada: conDuplicados, salida: unicos };
+  })(),
+  // la etiqueta de un fix no aplicado: los automáticos llevan sufijo
+  etiquetas: [
+    { descripcion: "Aceptar EULA (eula=true)", considerable: false },
+    { descripcion: "Cambiar el puerto", considerable: true },
+    { descripcion: "Subir la RAM", considerable: true },
+    { descripcion: "Poner sync-chunk-writes=false", considerable: false },
+  ].map(({ descripcion, considerable }) => ({
+    descripcion,
+    considerable,
+    etiqueta: considerable ? descripcion : `${descripcion} (automático)`,
+  })),
+};
+writeFileSync(join(golden, "doctor.json"), JSON.stringify(doctorGolden, null, 2) + "\n", "utf8");
+
 console.log(
-  `golden: ${Object.keys(sueltos).length} generadores de hoja + ${Object.keys(proyecto).length} ficheros de proyecto + catálogo + ${tiersGolden.casos.length} perfiles + ${rconGolden.casos.length} paquetes RCON + ${benchGolden.cpuScore.length} scores + ${modpackGolden.mrpack.length + modpackGolden.curseforge.length + modpackGolden.noModpack.length} casos de modpack`
+  `golden: ${Object.keys(sueltos).length} generadores de hoja + ${Object.keys(proyecto).length} ficheros de proyecto + catálogo + ${tiersGolden.casos.length} perfiles + ${rconGolden.casos.length} paquetes RCON + ${benchGolden.cpuScore.length} scores + ${modpackGolden.mrpack.length + modpackGolden.curseforge.length + modpackGolden.noModpack.length} casos de modpack + ${doctorGolden.scores.length} scores del doctor`
 );
 console.log(`en ${golden}`);

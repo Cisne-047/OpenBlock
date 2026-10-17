@@ -1,0 +1,478 @@
+{
+  "scores": [
+    {
+      "errors": 0,
+      "warnings": 0,
+      "infos": 0,
+      "score": 100,
+      "grade": "SANO"
+    },
+    {
+      "errors": 0,
+      "warnings": 1,
+      "infos": 1,
+      "score": 95,
+      "grade": "SANO"
+    },
+    {
+      "errors": 0,
+      "warnings": 2,
+      "infos": 2,
+      "score": 90,
+      "grade": "SANO"
+    },
+    {
+      "errors": 0,
+      "warnings": 3,
+      "infos": 3,
+      "score": 85,
+      "grade": "OK CON AVISOS"
+    },
+    {
+      "errors": 0,
+      "warnings": 4,
+      "infos": 4,
+      "score": 80,
+      "grade": "OK CON AVISOS"
+    },
+    {
+      "errors": 0,
+      "warnings": 5,
+      "infos": 5,
+      "score": 75,
+      "grade": "OK CON AVISOS"
+    },
+    {
+      "errors": 0,
+      "warnings": 6,
+      "infos": 6,
+      "score": 70,
+      "grade": "OK CON AVISOS"
+    },
+    {
+      "errors": 1,
+      "warnings": 0,
+      "infos": 1,
+      "score": 80,
+      "grade": "OK CON AVISOS"
+    },
+    {
+      "errors": 1,
+      "warnings": 1,
+      "infos": 2,
+      "score": 75,
+      "grade": "OK CON AVISOS"
+    },
+    {
+      "errors": 1,
+      "warnings": 2,
+      "infos": 3,
+      "score": 70,
+      "grade": "OK CON AVISOS"
+    },
+    {
+      "errors": 1,
+      "warnings": 3,
+      "infos": 4,
+      "score": 65,
+      "grade": "NECESITA ATENCIÓN"
+    },
+    {
+      "errors": 1,
+      "warnings": 4,
+      "infos": 5,
+      "score": 60,
+      "grade": "NECESITA ATENCIÓN"
+    },
+    {
+      "errors": 1,
+      "warnings": 5,
+      "infos": 6,
+      "score": 55,
+      "grade": "NECESITA ATENCIÓN"
+    },
+    {
+      "errors": 1,
+      "warnings": 6,
+      "infos": 7,
+      "score": 50,
+      "grade": "NECESITA ATENCIÓN"
+    },
+    {
+      "errors": 2,
+      "warnings": 0,
+      "infos": 2,
+      "score": 60,
+      "grade": "NECESITA ATENCIÓN"
+    },
+    {
+      "errors": 2,
+      "warnings": 1,
+      "infos": 3,
+      "score": 55,
+      "grade": "NECESITA ATENCIÓN"
+    },
+    {
+      "errors": 2,
+      "warnings": 2,
+      "infos": 4,
+      "score": 50,
+      "grade": "NECESITA ATENCIÓN"
+    },
+    {
+      "errors": 2,
+      "warnings": 3,
+      "infos": 5,
+      "score": 45,
+      "grade": "NECESITA ATENCIÓN"
+    },
+    {
+      "errors": 2,
+      "warnings": 4,
+      "infos": 6,
+      "score": 40,
+      "grade": "NECESITA ATENCIÓN"
+    },
+    {
+      "errors": 2,
+      "warnings": 5,
+      "infos": 7,
+      "score": 35,
+      "grade": "CRÍTICO"
+    },
+    {
+      "errors": 2,
+      "warnings": 6,
+      "infos": 8,
+      "score": 30,
+      "grade": "CRÍTICO"
+    },
+    {
+      "errors": 3,
+      "warnings": 0,
+      "infos": 3,
+      "score": 40,
+      "grade": "NECESITA ATENCIÓN"
+    },
+    {
+      "errors": 3,
+      "warnings": 1,
+      "infos": 4,
+      "score": 35,
+      "grade": "CRÍTICO"
+    },
+    {
+      "errors": 3,
+      "warnings": 2,
+      "infos": 5,
+      "score": 30,
+      "grade": "CRÍTICO"
+    },
+    {
+      "errors": 3,
+      "warnings": 3,
+      "infos": 6,
+      "score": 25,
+      "grade": "CRÍTICO"
+    },
+    {
+      "errors": 3,
+      "warnings": 4,
+      "infos": 7,
+      "score": 20,
+      "grade": "CRÍTICO"
+    },
+    {
+      "errors": 3,
+      "warnings": 5,
+      "infos": 8,
+      "score": 15,
+      "grade": "CRÍTICO"
+    },
+    {
+      "errors": 3,
+      "warnings": 6,
+      "infos": 9,
+      "score": 10,
+      "grade": "CRÍTICO"
+    },
+    {
+      "errors": 4,
+      "warnings": 0,
+      "infos": 4,
+      "score": 20,
+      "grade": "CRÍTICO"
+    },
+    {
+      "errors": 4,
+      "warnings": 1,
+      "infos": 5,
+      "score": 15,
+      "grade": "CRÍTICO"
+    },
+    {
+      "errors": 4,
+      "warnings": 2,
+      "infos": 6,
+      "score": 10,
+      "grade": "CRÍTICO"
+    },
+    {
+      "errors": 4,
+      "warnings": 3,
+      "infos": 7,
+      "score": 5,
+      "grade": "CRÍTICO"
+    },
+    {
+      "errors": 4,
+      "warnings": 4,
+      "infos": 8,
+      "score": 0,
+      "grade": "CRÍTICO"
+    },
+    {
+      "errors": 4,
+      "warnings": 5,
+      "infos": 9,
+      "score": 0,
+      "grade": "CRÍTICO"
+    },
+    {
+      "errors": 4,
+      "warnings": 6,
+      "infos": 10,
+      "score": 0,
+      "grade": "CRÍTICO"
+    },
+    {
+      "errors": 5,
+      "warnings": 0,
+      "infos": 5,
+      "score": 0,
+      "grade": "CRÍTICO"
+    },
+    {
+      "errors": 5,
+      "warnings": 1,
+      "infos": 6,
+      "score": 0,
+      "grade": "CRÍTICO"
+    },
+    {
+      "errors": 5,
+      "warnings": 2,
+      "infos": 7,
+      "score": 0,
+      "grade": "CRÍTICO"
+    },
+    {
+      "errors": 5,
+      "warnings": 3,
+      "infos": 8,
+      "score": 0,
+      "grade": "CRÍTICO"
+    },
+    {
+      "errors": 5,
+      "warnings": 4,
+      "infos": 9,
+      "score": 0,
+      "grade": "CRÍTICO"
+    },
+    {
+      "errors": 5,
+      "warnings": 5,
+      "infos": 10,
+      "score": 0,
+      "grade": "CRÍTICO"
+    },
+    {
+      "errors": 5,
+      "warnings": 6,
+      "infos": 11,
+      "score": 0,
+      "grade": "CRÍTICO"
+    },
+    {
+      "errors": 6,
+      "warnings": 0,
+      "infos": 6,
+      "score": 0,
+      "grade": "CRÍTICO"
+    },
+    {
+      "errors": 6,
+      "warnings": 1,
+      "infos": 7,
+      "score": 0,
+      "grade": "CRÍTICO"
+    },
+    {
+      "errors": 6,
+      "warnings": 2,
+      "infos": 8,
+      "score": 0,
+      "grade": "CRÍTICO"
+    },
+    {
+      "errors": 6,
+      "warnings": 3,
+      "infos": 9,
+      "score": 0,
+      "grade": "CRÍTICO"
+    },
+    {
+      "errors": 6,
+      "warnings": 4,
+      "infos": 10,
+      "score": 0,
+      "grade": "CRÍTICO"
+    },
+    {
+      "errors": 6,
+      "warnings": 5,
+      "infos": 11,
+      "score": 0,
+      "grade": "CRÍTICO"
+    },
+    {
+      "errors": 6,
+      "warnings": 6,
+      "infos": 12,
+      "score": 0,
+      "grade": "CRÍTICO"
+    },
+    {
+      "errors": 0,
+      "warnings": 0,
+      "infos": 0,
+      "score": 100,
+      "grade": "SANO"
+    },
+    {
+      "errors": 0,
+      "warnings": 1,
+      "infos": 0,
+      "score": 95,
+      "grade": "SANO"
+    },
+    {
+      "errors": 0,
+      "warnings": 2,
+      "infos": 0,
+      "score": 90,
+      "grade": "SANO"
+    },
+    {
+      "errors": 0,
+      "warnings": 3,
+      "infos": 0,
+      "score": 85,
+      "grade": "OK CON AVISOS"
+    },
+    {
+      "errors": 0,
+      "warnings": 5,
+      "infos": 0,
+      "score": 75,
+      "grade": "OK CON AVISOS"
+    },
+    {
+      "errors": 0,
+      "warnings": 6,
+      "infos": 0,
+      "score": 70,
+      "grade": "OK CON AVISOS"
+    },
+    {
+      "errors": 0,
+      "warnings": 10,
+      "infos": 0,
+      "score": 50,
+      "grade": "NECESITA ATENCIÓN"
+    },
+    {
+      "errors": 0,
+      "warnings": 12,
+      "infos": 0,
+      "score": 40,
+      "grade": "NECESITA ATENCIÓN"
+    },
+    {
+      "errors": 0,
+      "warnings": 20,
+      "infos": 0,
+      "score": 0,
+      "grade": "CRÍTICO"
+    }
+  ],
+  "dedupe": {
+    "entrada": [
+      {
+        "severity": "error",
+        "code": "EULA_FILE"
+      },
+      {
+        "severity": "warning",
+        "code": "SYNC_CHUNK_WRITES"
+      },
+      {
+        "severity": "error",
+        "code": "EULA_FILE"
+      },
+      {
+        "severity": "info",
+        "code": "PLUGIN_UPDATE"
+      },
+      {
+        "severity": "warning",
+        "code": "SYNC_CHUNK_WRITES"
+      },
+      {
+        "severity": "error",
+        "code": "ENGINE_JAR_MISSING"
+      }
+    ],
+    "salida": [
+      {
+        "severity": "error",
+        "code": "EULA_FILE"
+      },
+      {
+        "severity": "warning",
+        "code": "SYNC_CHUNK_WRITES"
+      },
+      {
+        "severity": "info",
+        "code": "PLUGIN_UPDATE"
+      },
+      {
+        "severity": "error",
+        "code": "ENGINE_JAR_MISSING"
+      }
+    ]
+  },
+  "etiquetas": [
+    {
+      "descripcion": "Aceptar EULA (eula=true)",
+      "considerable": false,
+      "etiqueta": "Aceptar EULA (eula=true) (automático)"
+    },
+    {
+      "descripcion": "Cambiar el puerto",
+      "considerable": true,
+      "etiqueta": "Cambiar el puerto"
+    },
+    {
+      "descripcion": "Subir la RAM",
+      "considerable": true,
+      "etiqueta": "Subir la RAM"
+    },
+    {
+      "descripcion": "Poner sync-chunk-writes=false",
+      "considerable": false,
+      "etiqueta": "Poner sync-chunk-writes=false (automático)"
+    }
+  ]
+}

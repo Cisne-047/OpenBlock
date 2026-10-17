@@ -23,6 +23,7 @@
 //! - [ ] `plan` y `api` — resolución de descargas contra las APIs
 
 pub mod catalog;
+pub mod doctor;
 pub mod generators;
 pub mod hw;
 pub mod modrinth;
