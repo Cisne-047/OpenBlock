@@ -1,34 +1,39 @@
 # Historial de cambios
 
-Las etiquetas del repositorio siguen `vX.Y.Z`. La v0.1.0 cierra el trabajo acumulado desde el primer commit: OpenBlock instala, arranca y diagnostica servers de Minecraft.
+Las etiquetas del repositorio siguen `vX.Y.Z`. La v0.2.0 es el port a Rust: el binario `forge` pasa a ser lo que se distribuye —desde los Releases de GitHub— y el TypeScript se queda en `legacy/` como espejo de paridad, generando el golden contra el que se compara cada byte. El paquete de npm se queda congelado en la v0.1.0.
 
-OpenBlock es el hermano de [DistroForge](https://github.com/cisne-047/DistroForge) (que forja distros Linux): comparten arquitectura —config declarativa, generadores puros que producen un `FileMap`, round-trip del proyecto y suite vitest— pero **no comparten código**. Aquí se registra solo lo que cambia en OpenBlock. Lo que se **publica** sigue siendo el TypeScript: el port a Rust vive en `rust/` y avanza con paridad byte a byte contra el TS, que es la referencia y no se mueve a `legacy/` hasta que el binario sea lo que se distribuye.
+OpenBlock es el hermano de [DistroForge](https://github.com/cisne-047/DistroForge) (que forja distros Linux): comparten arquitectura —config declarativa, generadores puros que producen un `FileMap`, round-trip del proyecto y comparación byte a byte— pero **no comparten código**. Aquí se registra solo lo que cambia en OpenBlock.
 
-## Sin publicar
+## v0.2.0 (17/10/2026)
 
-### El port a Rust
+### El port a Rust, completo
 
-Trabajo en `rust/`, fuera de lo que se publica en npm. Estado por módulo,
-divergencias y receta en [`rust/README.md`](rust/README.md).
+- **El binario es el producto.** `rust/` tiene el port entero —núcleo, APIs y CLI— en tres crates: `forge-core` (puro, sin disco ni red), `forge-api` (la red) y `forge-cli` (el sistema). La CLI `forge` sustituye a `openblock`, y el TypeScript se movió a `legacy/` sin borrarse: sigue generando el golden.
+- **Paridad byte a byte**: los 23 ficheros del proyecto salen idénticos al TS, `openblock.json` incluido, más los tiers, el catálogo, el códec RCON y el doctor. 51 ficheros de golden en el núcleo y 2 en las APIs; si alguien cambia un generador en un lado y no en el otro, el test falla diciendo **el fichero, la línea y el byte**. El CI regenera el golden y comprueba con `git diff --exit-code` que está al día.
+- **135 tests en Rust** (101 en el TS), `clippy -D warnings` y `fmt` limpios, y el self-test de verdad —instala un Paper, lo arranca y lo diagnostica— como gate del CI.
+- **El TS se partió en dos** para que el port tuviera qué comparar: cada función de red tiene al lado su mapeo puro (`paperBuilds` / `paperBuildsFrom`), con 14 tests nuevos en `legacy/tests/engines.test.ts` que fijan las rarezas que el port reproduce a propósito.
+- **Divergencias anotadas, no silenciosas**: el benchmark mide con `u64` en vez del `BigInt` sin límite del TS (el score no es comparable entre los dos, y se dice), Rust pide el tipo de las respuestas ajenas en vez de coaccionar, y los enums son cerrados. La lista completa está en [`rust/README.md`](rust/README.md).
+- **La paridad cazó el bump de versión**: el `User-Agent` va dentro de los `install.ps1` que se generan, así que subir la versión en Rust y no en el TS rompió el golden —con fichero, línea y byte— hasta alinearlas.
 
-- **Núcleo generador completo y con paridad byte a byte**: los 23 ficheros del
-  proyecto salen idénticos al TS, `openblock.json` incluido, y los tiers coinciden
-  en 21 perfiles de hardware.
-- **Portado también**: catálogo, códec y cliente RCON, benchmark, parsers de
-  modpack, Mojang piston-meta, la aritmética del doctor (score, nota, dedupe) y
-  `api::engines` (PaperMC, Purpur, Folia, Fabric, Quilt, Forge, NeoForge).
-- **Pendiente**: el resolver de `plan`, las reglas del doctor, `apply`/`java` y el
-  resto de la CLI.
-- **El TS se ha partido en dos** para que el puerto tenga qué comparar: cada
-  función de red tiene al lado su mapeo puro (`paperBuilds` / `paperBuildsFrom`).
-  Sin cambio de comportamiento; 14 tests nuevos en `tests/engines.test.ts` que
-  fijan las rarezas que el port reproduce a propósito.
+### Distribución
 
-### Añadido
+- **GitHub Releases** (`release.yml`): al empujar un tag `v*` compila `x86_64-pc-windows-msvc` y `x86_64-unknown-linux-gnu`, comprueba que cada binario arranca y publica el Release con los dos assets y las notas generadas.
+- **Instaladores**: `install.sh` (Linux, a `~/.local/bin`) e `install.ps1` (Windows, a `%LOCALAPPDATA%\OpenBlock` y al PATH del usuario, sin permisos de administrador). Los dos bajan a un temporal y mueven al final, así que una descarga cortada no deja un `forge` a medias. El de Windows tiene `-DryRun` y los dos aceptan la versión a mano.
+- **`--version`** (y `-V`) en la CLI, que es lo que los instaladores usan para confirmar que el binario quedó bien.
+- El paquete de npm **no** se republica: `package.json` es privado y la 0.1.0 se queda como está.
 
-- `src/version.ts` como única fuente de la versión y del `User-Agent`.
-- `tests/engines.test.ts`: los quiebres del resolvedor de descargas, como
-  contrato del port.
+### La superficie de la CLI, que no cubría nadie
+
+- **`advanced` y `smoke` vuelven a existir**, como alias de `install` y de `self-test`: los tenía el TS y el port los había perdido sin que ningún test se enterara.
+- **`forge install --help` imprime la ayuda**: el `--help` se parseaba y se ignoraba, así que el comando se ponía a instalar con los defaults del hardware.
+- **Sin subcomando no se instala nada**: `forge` a secas imprime la ayuda, y `forge --engine paper` dice que eso es una flag y no un comando. El TS se iba al modo avanzado con todo `argv`; aquí se pide el subcomando, porque instalar por un flag mal escrito y sin preguntar es un regalo envenenado.
+- **`crates/forge-cli/tests/dispatch.rs`**: 8 tests que ejecutan el binario y fijan la superficie entera —alias, `--help`, sin subcomando, comando desconocido— sin tocar red ni disco. Es el hueco por el que se colaron los alias.
+- **La ayuda dice la verdad**: daba `guided` por pendiente cuando ya estaba, y no listaba ni `guided` ni `--version`.
+
+### Documentación
+
+- **`README.md` reescrito** para lo que se distribuye: instalación desde Releases, comandos `forge`, estructura de `rust/` y `legacy/`, y la verificación con las dos suites.
+- **`rust/README.md`** deja de ser un parte de obra: estado por módulo, divergencias, lo que está portado pero no probado, cómo se saca una versión y qué queda.
 
 ## v0.1.0 (publicada en npm el 17/10/2026)
 

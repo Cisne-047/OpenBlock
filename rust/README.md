@@ -1,8 +1,10 @@
 # OpenBlock en Rust
 
-Port del núcleo a Rust, **en curso**. El TypeScript sigue siendo la
-implementación de referencia y se queda en `src/` como espejo, igual que
-DistroForge mantiene su `legacy/`.
+Port completo del núcleo y de la CLI a Rust. El producto es el binario de
+`crates/forge-cli` (`forge`, v0.2.0); el TypeScript se movió a `legacy/` y sigue
+siendo la implementación de referencia y el espejo de paridad, igual que
+DistroForge mantiene su `legacy/`. Este documento es el traspaso: qué está
+portado, qué diverge a propósito y qué queda sin probar.
 
 ## Reparto
 
@@ -43,7 +45,6 @@ vigila al otro lado. `forge-api` es el único que hace red, igual que en el TS s
 | `api::engines` | portado (con `url` y `js` de apoyo) |
 | cliente de Modrinth | portado: query, primera versión y fichero primario |
 | `.mrpack` (zip) | portado: se lee el índice del zip y los overrides del de CurseForge |
-| `plan` (resolver el manifiesto) | pendiente |
 | `doctor` (aritmética: score, nota, dedupe) | portado |
 | `doctor` (reglas de log) | portado, con sus descripciones |
 | `doctor` (reglas estáticas) | portado, con la vista y los hechos inyectados |
@@ -60,8 +61,8 @@ vigila al otro lado. `forge-api` es el único que hace red, igual que en el TS s
 | `advanced` (las flags y la config) | portado: flag > config previa > hardware |
 | `hw::bench` (la medida, no solo la fórmula) | portado, con una divergencia que se explica |
 | `guided` (el asistente) | portado entero, modpack incluido |
-| CLI | `detect`, `bench`, `plan`, `dump`, `install`, `generate`, `info`, `guided`, `doctor`, `backup`, `stop`, `self-test`, `latest`, `rcon` y `help` |
-| **falta** | decidir cómo se instala el binario sin tener Rust |
+| CLI | `detect`, `bench`, `plan`, `dump`, `install` (con `advanced` de alias), `generate`, `info`, `guided`, `doctor`, `backup`, `stop`, `self-test` (con `smoke` de alias), `latest`, `rcon`, `help` y `--version` |
+| distribución | GitHub Releases: `release.yml` compila y publica los binarios al empujar un tag, y `install.sh` / `install.ps1` los instalan sin Rust ni Node |
 
 **El núcleo generador está completo y con paridad byte a byte**: los 23 ficheros
 del proyecto salen idénticos al TypeScript, `openblock.json` incluido. Los tiers
@@ -104,7 +105,7 @@ Se verifica como DistroForge verifica sus APIs: ejecutando las dos
 implementaciones contra la misma API en el mismo minuto y comparando.
 
 ```bash
-./node_modules/.bin/tsx tests/plan-live.ts tests/fixtures/parity-config.json > ts-plan.json
+./node_modules/.bin/tsx legacy/tests/plan-live.ts tests/fixtures/parity-config.json > ts-plan.json
 cargo run -q --manifest-path rust/Cargo.toml -p forge-cli -- \
   plan tests/fixtures/parity-config.json > rust-plan.json
 diff ts-plan.json rust-plan.json
@@ -188,7 +189,7 @@ Y `javaBinDir` no se portó: el TS la exporta y **no la usa nadie**.
 `apply` se verifica por el resultado, que es lo que el usuario tiene delante:
 
 ```bash
-./node_modules/.bin/tsx tests/apply-live.ts tests/fixtures/parity-config.json /tmp/a 16
+./node_modules/.bin/tsx legacy/tests/apply-live.ts tests/fixtures/parity-config.json /tmp/a 16
 cargo run -q -p forge-cli -- install tests/fixtures/parity-config.json --dir /tmp/b --cores 16
 diff -r /tmp/a /tmp/b
 ```
@@ -447,22 +448,46 @@ Deliberadas y anotadas, como la lista que DistroForge mantiene en su
    `sha256: null` donde se espera texto) da error en vez de seguir. Copiar el
    intérprete de JavaScript no es el objetivo del puerto.
 
+## Distribución
+
+El binario se publica en **GitHub Releases**, no en npm: el paquete de npm quedó
+congelado en la v0.1.0 (el TypeScript) y el producto es `forge`.
+
+**Cómo se saca una versión.** La versión vive en `rust/Cargo.toml` (el workspace) y
+en `legacy/src/version.ts`, y **tiene que ser la misma en los dos**: el `User-Agent`
+va dentro de los `install.ps1` que generan, así que si divergen salta el golden de
+paridad. Pasó al subir a la 0.2.0, y es exactamente lo que ese test tiene que cazar:
+señaló el fichero, la línea y el byte.
+
+1. Sube la versión en `rust/Cargo.toml`, en `legacy/src/version.ts` y en
+   `package.json` (el del npm congelado).
+2. `npm run parity:golden` —cambia el `User-Agent` del golden— y `cargo test`.
+3. Commit, push y **tag**: `git tag v0.2.0 && git push origin v0.2.0`.
+4. `release.yml` compila para `x86_64-pc-windows-msvc` y para
+   `x86_64-unknown-linux-gnu`, comprueba que cada binario arranca (`--help`) y crea
+   el Release con los dos assets y las notas generadas.
+
+Los instaladores (`install.sh`, `install.ps1`) apuntan a
+`releases/latest/download/…`, así que no hay que tocarlos al publicar: cogen la
+última versión. Si algún día hiciera falta clavar una, los dos aceptan la versión a
+mano (`OPENBLOCK_VERSION`, `-Version`).
+
+Lo que **no** se distribuye: el paquete de npm (congelado en la 0.1.0) y `cargo
+install`, que obligaría al usuario a tener Rust — justo lo que el binario evita.
+
 ## Cómo continuar
 
-### Qué falta, en orden
+### Qué queda por hacer
 
-| fichero TS | líneas | a dónde va | por qué |
-|---|---|---|---|
-| `src/api/modrinth.ts` | 126 | `forge-api` (la query y la elección) | falta la descarga del `.mrpack` y descomprimir el zip |
-| `src/doctor.ts` | 629 | `forge-cli` (aritmética, reglas de log y estáticas ya en el núcleo) | quedan el boot test, los `apply` y el subcomando |
-| `src/apply.ts`, `java.ts` | 360 | `forge-cli` | escritura, descargas, JDK |
-| `src/advanced.ts`, `guided.ts`, `index.ts` | 729 | `forge-cli` | la CLI completa |
+El port está completo: no queda ningún módulo del TS que el TS use. Lo que queda
+es lo que la suite no puede probar sola, y está contado arriba:
 
-**El doctor es el trozo grande y el que más valor tiene.** El orden que menos
-sufrimiento da: doctor → `apply`/`java` → el resto de la CLI.
-
-Con el plan resuelto, `forge plan <cfg>` + `forge dump <cfg> <plan> <dir>` ya
-hacen lo que hace `openblock generate`, que es el camino crítico del producto.
+| queda | por qué |
+|---|---|
+| la rama de descarga de Adoptium: el `tar` y el JDK ya extraído | haría falta una máquina sin ese JDK, y son 200 MB en cada `cargo test` |
+| el asistente, comparado contra el TS | el `readline` del TS no se lleva bien con la entrada por tubería |
+| `run_backup` con el script corriendo de verdad | la política de ejecución de Windows lo bloquea |
+| los binarios, instalados y ejecutados en Windows y Linux | lo hace `release.yml` al publicar un tag, que es lo que queda por estrenar |
 
 La pauta de `engines` —cada función de red con su parte pura al lado— es la que
 hay que repetir: `paper_builds` hace la petición y `paper_builds_from` mapea la
@@ -519,15 +544,16 @@ que ahora vive en `legacy/tests/parity-golden.ts` con el tooling en la raíz), a
 cada byte que produce el Rust se sigue comparando contra el original.
 
 Lo que cambió: el producto es el binario de `rust/`, el paquete de npm quedó
-congelado en v0.1.0 (`legacy/package.json` es privado) y la distribución del binario
-—cómo se instala `forge` en una máquina sin Rust— es lo que falta por decidir.
+congelado en v0.1.0 (el `package.json` de la raíz es privado) y la distribución es
+la de arriba: los Releases de GitHub, con el tag como único disparador.
 
 ## Por qué Rust
-## Por qué Rust
 
-No arregla el reparto —ese problema ya está resuelto publicando en npm, y
+No arregla el reparto —ese problema ya estaba resuelto publicando en npm, y
 `cargo install` sería *peor* para el usuario porque le obligaría a tener Rust—.
 Se hace porque un binario único sin dependencia de Node es un final mejor para
-una CLI que la gente va a ejecutar en su máquina, y porque el núcleo ya es puro y
-tiene 101 tests como contrato. El reparto en npm sigue funcionando durante todo el
-port: no hay una fase en la que OpenBlock esté roto.
+una CLI que la gente va a ejecutar en su máquina, y porque el núcleo del TS ya era
+puro y tenía 101 tests como contrato: el port tenía contra qué compararse desde el
+primer día, y ahora tiene 135. Durante el port el reparto en npm siguió
+funcionando, así que no hubo una fase en la que OpenBlock estuviera roto; cuando el
+port acabó, el binario tomó el relevo y el npm se quedó donde estaba.

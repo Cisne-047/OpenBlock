@@ -262,7 +262,7 @@ pub struct LogRule {
 
 /// Qué grupo de la captura necesita el fix de una regla, si necesita alguno.
 ///
-/// En el TS lo lleva la closure (m[1]); aquí, el dato, porque el pply vive en
+/// En el TS lo lleva la closure (m[1]); aquí, el dato, porque el `apply` vive en
 /// el CLI y no puede quedarse con el match.
 pub fn arg_grupo(code: &str) -> Option<usize> {
     match code {

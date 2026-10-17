@@ -2,58 +2,81 @@
 
 **Forja servidores de Minecraft según tu hardware.** Hermano de [DistroForge](https://github.com/cisne-047/DistroForge) (que forja distros Linux): OpenBlock forja servidores de MC.
 
-> **Dónde está cada cosa.** El **producto es el binario de Rust** de [`rust/`](rust/README.md): ahí están el plan, el generador, el doctor y toda la CLI (`forge`). El **TypeScript vive en [`legacy/`](legacy/)** como referencia y **espejo de paridad**: el golden lo sigue generando él, así que cada byte de lo que produce el Rust se sigue comparando contra el original. El paquete de npm quedó **congelado en v0.1.0** (`legacy/package.json` es privado): la distribución del binario es el siguiente paso y está anotada en [`rust/README.md`](rust/README.md).
+> **Dónde está cada cosa.** El **producto es el binario de Rust** de [`rust/`](rust/README.md): ahí están el plan, el generador, el doctor y toda la CLI (`forge`). El **TypeScript vive en [`legacy/`](legacy/)** como referencia y **espejo de paridad**: el golden lo sigue generando él, así que cada byte de lo que produce el Rust se sigue comparando contra el original. El paquete de npm quedó **congelado en la v0.1.0**.
 >
-> Lo de abajo describe el comportamiento del CLI, que es el mismo en los dos: `forge <comando>` en Rust, `openblock <comando>` en el TypeScript de `legacy/`.
+> Lo de abajo describe el comportamiento del CLI, que es el mismo en los dos: `forge <comando>` en Rust (lo que se distribuye) y `openblock <comando>` en el TypeScript de `legacy/`.
 
-- **Requiere**: el binario (no necesita Node). El TypeScript de `legacy/`, si quieres usarlo, pide Node.js 20 o superior. Java se gestiona solo (OpenBlock se descarga el JDK que pida la versión de MC), aunque para el `self-test` conviene tener uno a mano
+- **Requiere**: el binario (no necesita Node ni Rust). El TypeScript de `legacy/`, si quieres usarlo, pide Node.js 20 o superior. Java se gestiona solo (OpenBlock se descarga el JDK que pida la versión de MC), aunque para el `self-test` conviene tener uno a mano
 - **Historial de cambios**: [CHANGELOG.md](CHANGELOG.md)
 - **Licencia**: MIT para el código; el banner y el nombre quedan fuera ([LICENSE](LICENSE))
-- **Estado**: v0.1.0 publicada en npm (TypeScript); el port a Rust está completo y verificado
+- **Estado**: v0.2.0 — el binario se instala desde [Releases](https://github.com/Cisne-047/OpenBlock/releases) (Windows y Linux x86_64); el paquete de npm se quedó en la v0.1.0, congelado
 
 Detecta tu máquina (Windows/Linux), elige engine, build exacta, RAM, GC, distancias y plugins/mods de rendimiento, instala todo y **deja el server arrancable con un script**. Y cuando está listo, el **Doctor** hace un dry run: cuenta errores y warnings, arregla lo seguro y te pregunta antes de tocar nada considerable.
 
-Misma arquitectura que DistroForge: TypeScript ESM + generadores puros (`FileMap`), proyecto con `openblock.json` de round-trip, zip portable, vitest. Presentación estilo Minecraft (splash texts, logros, barras de cofre).
+Misma arquitectura que DistroForge: núcleo puro + generadores deterministas (`FileMap`), proyecto con `openblock.json` de round-trip, zip portable, y una suite que compara la implementación nueva contra la vieja byte a byte. Presentación estilo Minecraft (splash texts, logros, barras de cofre).
 
 ## Uso
 
+El binario se instala desde los **Releases de GitHub**: no necesita Rust ni Node.
+
+**Linux**
+
 ```bash
-npm install -g openblock
-openblock                    # modo guiado (wizard estilo MC)
+curl -fsSL https://raw.githubusercontent.com/Cisne-047/OpenBlock/main/install.sh | sh
 ```
 
-Si trabajas sobre el código, en vez de instalar:
+**Windows** (PowerShell, sin permisos de administrador)
+
+```powershell
+irm https://raw.githubusercontent.com/Cisne-047/OpenBlock/main/install.ps1 | iex
+```
+
+Deja `forge` en `~/.local/bin` (Linux) o en `%LOCALAPPDATA%\OpenBlock` con el PATH
+del usuario (Windows). Si prefieres bajarte el binario a mano, está en
+[Releases](https://github.com/Cisne-047/OpenBlock/releases):
+`forge-x86_64-unknown-linux-gnu` y `forge-x86_64-pc-windows-msvc.exe`. Los dos
+instaladores aceptan la versión (`OPENBLOCK_VERSION=0.2.0`, `-Version 0.2.0`), el
+destino (`OPENBLOCK_BIN`) y el de Windows un `-DryRun` que dice qué haría sin bajar nada.
+
+```bash
+forge                              # sin subcomando imprime la ayuda; no instala nada
+forge guided                       # modo guiado: pregunta y instala
+forge install --config mi.json     # o por flags: forge install --engine paper --mc 1.21.4
+forge detect                       # hardware + tier + recomendación
+forge bench                        # + benchmark real de CPU y disco
+forge generate --zip server.zip    # proyecto portable sin instalar
+forge doctor --dir ./server        # mini-IA: dry run + fixes
+forge backup --dir ./server
+forge stop --dir ./server          # apagado limpio por RCON
+forge self-test                    # instala un Paper real, lo arranca y lo diagnostica
+forge --version
+```
+
+Todo por flags, scriptable (`advanced` sigue existiendo como alias de `install`, que
+es el nombre que le daba el TypeScript):
+
+```bash
+forge install --engine paper --mc 1.21.4 --build 217 --ram-mb 8192 --players 20 \
+  --profile balanced --dir ./server --yes
+```
+
+El modo avanzado no pregunta nada —`--yes` se acepta por compatibilidad—, que es lo
+que permite usarlo desde un script. `--pregen 4000` añade la pregeneración, que
+arranca el server de verdad y tarda lo suyo; sin esa flag no se pregenera.
+
+El **TypeScript vive en [`legacy/`](legacy/)** y ya no se distribuye: el paquete de
+npm está congelado en la v0.1.0. Sigue siendo la referencia de paridad —el golden lo
+genera él— y si quieres usarlo, `npm install && npm run openblock` desde el clon.
+
+Si trabajas sobre el código:
 
 ```bash
 git clone https://github.com/Cisne-047/OpenBlock.git
 cd OpenBlock
-npm install
-npm run openblock            # ejecuta el TS directamente, sin compilar
-npm run build                # compila a dist/ (es lo que se publica)
-```
-
-**Instalar desde el clon no funciona con npm 12.** `npm install -g ./OpenBlock`
-no produce el comando: el clon no trae `dist/` y npm 12 bloquea los scripts de
-instalación (`install-scripts blocked`), así que nada lo compila. Por eso el
-paquete se publica compilado: el tarball ya lleva `dist/`, no necesita `tsx` ni
-compilar en tu máquina. Si vienes del clon, haz `npm run build` antes.
-
-```bash
-# Modo avanzado: todo por flags, scriptable
-openblock advanced \
-  --engine paper --mc 1.21.4 --build 217 --ram-mb 8192 --players 20 \
-  --pregen 4000 --profile balanced --dir ./server --yes
-```
-
-```bash
-openblock detect             # hardware + tier + recomendación
-openblock bench              # + benchmark real de CPU y disco
-openblock generate --zip server.zip    # proyecto portable sin instalar
-openblock doctor --dir ./server       # mini-IA: dry run + fixes
-openblock backup --dir ./server
-openblock stop   --dir ./server       # apagado limpio por RCON
-openblock self-test          # instala un Paper real, lo arranca y lo diagnostica
-npm test
+cargo build --manifest-path rust/Cargo.toml --release   # → rust/target/release/forge
+cargo test  --manifest-path rust/Cargo.toml             # 135 tests, con el golden del TS
+npm install && npm test                                 # 101 del TypeScript, el original
+npm run parity                                          # regenera el golden y corre el Rust
 ```
 
 ## Builds exactas por engine
@@ -77,9 +100,9 @@ O en el guiado, pregunta a pregunta. Los de URL se bajan al server; los locales 
 ## El Doctor (mini-IA de diagnóstico)
 
 ```bash
-openblock doctor --dir ./server            # boot test real + fixes
-openblock doctor --dir ./server --no-boot  # solo análisis estático
-openblock doctor --dir ./server --json     # reporte JSON (scripts/port Rust)
+forge doctor --dir ./server            # boot test real + fixes
+forge doctor --dir ./server --no-boot  # solo análisis estático
+forge doctor --dir ./server --json     # reporte JSON (scripts/port Rust)
 ```
 
 1. **Análisis estático**: EULA, `sync-chunk-writes`, contraseña RCON, versión de Java vs MC, puerto ocupado, jar del engine, actualizaciones de plugins en Modrinth.
@@ -101,66 +124,63 @@ El guiado ofrece el doctor al terminar la instalación (cuando la pregeneración
 ## Estructura
 
 ```
-src/
-  catalog.ts        engines, plugins/mods por loader+versión, mapa Java/MC
-  version.ts        fuente única de la versión (banner, user agent, scripts)
-  hw/               detección (CIM/PowerShell en Windows, /proc+lsblk en Linux), tiers, bench
-  api/              Mojang piston-meta, PaperMC fill v3, Purpur, Fabric/Quilt meta,
-                    Forge maven+promos, NeoForge maven, Modrinth v2 (+mrpack, CurseForge)
-  generators/       PURO: jvm.ts (Aikar/ZGC), properties.ts, paper.ts, scripts.ts,
-                    service.ts, ops.ts (firewall+backup), index.ts (FileMap)
-  output.ts         E/S: escribir el FileMap a disco y empaquetarlo en zip
-  plan.ts           manifiesto de descargas (builds exactas + custom items) resuelto por API
-  apply.ts          ejecuta: escribe, baja, instala, pregenera por RCON
-  doctor.ts         mini-IA: reglas estáticas + de log, boot test, fixes, score
-  selftest.ts       self-test: instala un Paper real, lo arranca y lo diagnostica
-  cli.ts            parseo de flags y política de escritura del doctor
-  guided.ts         wizard · advanced.ts flags · index.ts CLI · rcon.ts · ui.ts (estilo MC)
-tests/              vitest (86): tiers, flags Aikar exactos, properties, rcon codec,
-                    mrpack, doctor, pureza del núcleo, veredicto del self-test y
-                    barrido de "undefined"
-dist/               JS compilado (lo que se instala); no se versiona
+rust/crates/
+  forge-core/   PURO: types, catalog, plan, doctor, rcon, hw/ (detección, tiers,
+                bench) y generators/ (jvm, properties, paper, service, scripts, ops)
+  forge-api/    red: Mojang, Paper/Purpur/Folia, Fabric/Quilt, Forge/NeoForge,
+                Modrinth (+mrpack y CurseForge) y la descarga con hash y reintento
+  forge-cli/    sistema: detect, apply (instalar), java, doctor, guided, bench,
+                selftest, rcon y el despacho de subcomandos
+legacy/
+  src/          el TypeScript original (30 ficheros): el espejo de paridad
+  tests/        vitest (101) y parity-golden.ts, que es quien genera el golden
+tests/fixtures/ config y respuestas de las APIs grabadas, compartidas por los dos
+.github/workflows/  ci.yml (3 jobs) y release.yml (los binarios, al publicar un tag)
 ```
 
-`generators/` no importa `node:*` ni lanza: construye contenido y nada más. La E/S
-está en `output.ts` y `apply.ts`. `tests/purity.test.ts` lo comprueba, así que la
-regla no depende de que alguien se acuerde.
-
-El código se escribe en TypeScript y **se publica compilado**: `npm run build`
-emite `dist/` y el `bin` apunta ahí, así que el paquete instalado no necesita
-`tsx` ni ningún cargador. Por eso los imports relativos llevan extensión `.js`
-(aunque el fichero sea `.ts`): es lo que exige Node ESM y lo que hace que el JS
-emitido se resuelva sin ayuda.
+`forge-core` no toca disco, ni red, ni procesos: construye contenido y nada más. La
+E/S está en `forge-cli` y la red en `forge-api`, y hay tests que lo comprueban, así
+que la regla no depende de que alguien se acuerde. Los 23 ficheros del proyecto
+—`openblock.json` incluido— salen idénticos a los del TypeScript.
 
 ## Verificación
 
-Dos niveles, porque la suite sola no basta:
+Dos suites y una comparación:
 
 ```bash
-npm test                # 86 tests: unitarios, sin arrancar ningún server
-npm run smoke           # compila + self-test: instala, arranca y diagnostica un Paper real
+cargo test --manifest-path rust/Cargo.toml   # 135: núcleo, APIs y CLI
+npm test                                     # 101 del TypeScript, que es el original
+npm run parity                               # regenera el golden y vuelve a correr el Rust
+cargo run --release -- self-test             # instala un Paper real, lo arranca y lo diagnostica
 ```
 
-`self-test` existe por un motivo concreto: la suite pasa sin tocar un JAR, y por
-ahí se coló un bug que 77 tests daban por bueno (`doctor --yes` dejó de aplicar
-fixes). El self-test comprueba lo que los tests no pueden: instalación real,
-arranque real (`Done`), diagnóstico limpio sobre un server recién forjado, que el
-modo de solo lectura no escriba nada, y apagado limpio por RCON. Falla con código
-de salida distinto de cero, así que sirve de gate en CI
-(`.github/workflows/ci.yml`, job `smoke`). Es el equivalente del smoke test de
-QEMU que DistroForge corre sobre su ISO.
+El núcleo Rust se compara **byte a byte** contra el TypeScript: el golden lo genera
+el TS y lo consume Rust, en dos sitios (`forge-core/tests/golden`, 51 ficheros, y
+`forge-api/tests/golden`, 2). Si alguien cambia un generador en un lado y no en el
+otro, el test falla diciendo **el fichero, la línea y el byte**. El CI regenera el
+golden y comprueba con `git diff --exit-code` que está al día, así que la paridad no
+puede derivar en silencio. El detalle —estado por módulo, divergencias conocidas y lo
+que está portado pero no probado— está en [`rust/README.md`](rust/README.md).
 
-Opciones: `--mc 1.20.4` (su Java debe existir en la máquina; por defecto 1.20.4,
-que va con Java 17), `--port 25599` y `--keep` para no borrar el directorio.
+`self-test` existe por un motivo concreto: la suite pasa sin tocar un JAR, y por ahí
+se coló un bug que 77 tests daban por bueno (`doctor --yes` dejó de aplicar fixes).
+El self-test comprueba lo que los tests no pueden: instalación real, arranque real
+(`Done`), diagnóstico limpio sobre un server recién forjado, que el modo de solo
+lectura no escriba nada, y apagado limpio por RCON. Falla con código de salida
+distinto de cero, así que sirve de gate en CI (`.github/workflows/ci.yml`, job
+`smoke`). Es el equivalente del smoke test de QEMU que DistroForge corre sobre su ISO.
+
+Opciones: `--mc 1.20.4` (su Java debe existir en la máquina; por defecto 1.20.4, que
+va con Java 17), `--port 25599` y `--keep` para no borrar el directorio.
 
 ## Por qué existe
 
-DistroForge te forja la distro; OpenBlock te forja el server que corre en ella.
-Ambos comparten idea: **config declarativa + generadores puros → proyecto ejecutable**.
+DistroForge te forja la distro; OpenBlock te forja el server que corre en ella. Ambos
+comparten idea: **config declarativa + generadores puros → proyecto ejecutable**.
 
-DistroForge **ya completó su port a Rust** (v0.4.0): su núcleo es `forge-core`, y
-la app React/TS original quedó en `legacy/` como referencia y suite de paridad.
-Su paridad no la sostiene un fichero de versión —no lo tiene— sino tres cosas:
+DistroForge **ya completó su port a Rust** (v0.4.0): su núcleo es `forge-core`, y la
+app React/TS original quedó en `legacy/` como referencia y suite de paridad. Su
+paridad no la sostiene un fichero de versión —no lo tiene— sino tres cosas:
 
 1. **Serialización byte-estable**: el orden de campos del struct replica el de la
    interfaz TS, porque `JSON.stringify` y serde serializan en orden de declaración.
@@ -169,8 +189,9 @@ Su paridad no la sostiene un fichero de versión —no lo tiene— sino tres cos
 3. **Un `diff -r` documentado**: generar el mismo proyecto con las dos
    implementaciones y comparar; byte a byte idénticos.
 
-OpenBlock va por ese camino: núcleo puro, generadores deterministas y
-`doctor --json` como contrato de verificación. El port está en `rust/`, con su
-propio [`rust/README.md`](rust/README.md) —estado por módulo, divergencias
-conocidas y la receta para seguir—. Lo publicado sigue siendo el TypeScript.
-
+OpenBlock hizo el mismo camino y la v0.2.0 es el port completo: el binario `forge`
+sustituye al CLI de TypeScript, que se queda en `legacy/` generando el golden. Con
+una diferencia: aquí la paridad no depende de un `diff -r` manual, la mide la suite
+—51 ficheros de golden del núcleo y 2 de las APIs, regenerados en cada CI— y lo que
+no puede tener golden (las builds que devuelve PaperMC ese día) se verifica
+ejecutando las dos implementaciones contra la misma API en el mismo minuto.
