@@ -2,13 +2,13 @@ import { existsSync } from "node:fs";
 import { mkdtemp, readdir, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { applyConfig, ensureRconPassword } from "./apply";
-import { javaMajorFor } from "./catalog";
-import { runDoctor } from "./doctor";
-import type { DoctorReport } from "./doctor";
-import { detectHardware } from "./hw/detect";
-import type { ServerConfig } from "./types";
-import { c } from "./ui";
+import { applyConfig, ensureRconPassword } from "./apply.js";
+import { javaMajorFor } from "./catalog.js";
+import { runDoctor } from "./doctor.js";
+import type { DoctorReport } from "./doctor.js";
+import { detectHardware } from "./hw/detect.js";
+import type { ServerConfig } from "./types.js";
+import { c } from "./ui.js";
 
 /**
  * `openblock self-test`: instala un server real, lo arranca, lo diagnostica y

@@ -1,4 +1,4 @@
-import type { ServerConfig } from "../types";
+import type { ServerConfig } from "../types.js";
 
 /**
  * Configs de la familia Paper (paper/purpur/folia): paper-global.yml,

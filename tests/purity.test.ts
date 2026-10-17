@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import { generateProject } from "../src/generators";
-import { planFor, serverCfg } from "./helpers";
+import { generateProject } from "../src/generators/index.js";
+import { planFor, serverCfg } from "./helpers.js";
 
 /**
  * Estos dos invariantes no son míos: son los de DistroForge, y son los que

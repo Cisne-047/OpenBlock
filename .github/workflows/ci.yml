@@ -20,6 +20,8 @@ jobs:
       - name: Dependencias
         run: npm ci
       - name: Tipos
+        run: npm run typecheck
+      - name: Compila (dist/ es lo que se instala)
         run: npm run build
       - name: Tests
         run: npm test

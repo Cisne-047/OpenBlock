@@ -2,7 +2,7 @@ import { execFile } from "node:child_process";
 import { readFile, stat } from "node:fs/promises";
 import os from "node:os";
 import { promisify } from "node:util";
-import type { HardwareProfile } from "../types";
+import type { HardwareProfile } from "../types.js";
 
 const exec = promisify(execFile);
 const TIMEOUT = 8000;

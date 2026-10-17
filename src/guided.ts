@@ -1,11 +1,11 @@
 import { randomBytes } from "node:crypto";
 import { existsSync } from "node:fs";
 import { basename, resolve } from "node:path";
-import { ENGINES, engineById } from "./catalog";
-import { applyConfig, ensureRconPassword, extractCfOverrides } from "./apply";
-import { detectHardware } from "./hw/detect";
-import { classifyHardware, recommendedRamMB } from "./hw/tiers";
-import { latestRelease } from "./api/mojang";
+import { ENGINES, engineById } from "./catalog.js";
+import { applyConfig, ensureRconPassword, extractCfOverrides } from "./apply.js";
+import { detectHardware } from "./hw/detect.js";
+import { classifyHardware, recommendedRamMB } from "./hw/tiers.js";
+import { latestRelease } from "./api/mojang.js";
 import {
   fabricLoaderVersions,
   forgeBuilds,
@@ -14,12 +14,12 @@ import {
   purpurBuilds,
   quiltLoaderVersions,
   type BuildInfo,
-} from "./api/engines";
-import { fetchMrpack } from "./plan";
-import { parseCfManifest, cfLoaderKind } from "./api/modrinth";
-import { runDoctor, printReport } from "./doctor";
-import type { CustomItem, EngineId, ServerConfig } from "./types";
-import { ask, askChoice, askNumber, c, confirm, kvTable } from "./ui";
+} from "./api/engines.js";
+import { fetchMrpack } from "./plan.js";
+import { parseCfManifest, cfLoaderKind } from "./api/modrinth.js";
+import { runDoctor, printReport } from "./doctor.js";
+import type { CustomItem, EngineId, ServerConfig } from "./types.js";
+import { ask, askChoice, askNumber, c, confirm, kvTable } from "./ui.js";
 
 /** lista de builds disponibles según engine, para elegir la exacta */
 async function buildsFor(engine: EngineId, mc: string): Promise<BuildInfo[]> {

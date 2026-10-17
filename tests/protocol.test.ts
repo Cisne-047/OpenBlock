@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { decodePacket, encodePacket } from "../src/rcon";
-import { cfLoaderKind, mrpackServerFiles, parseCfManifest, parseMrpackIndex } from "../src/api/modrinth";
+import { decodePacket, encodePacket } from "../src/rcon.js";
+import { cfLoaderKind, mrpackServerFiles, parseCfManifest, parseMrpackIndex } from "../src/api/modrinth.js";
 
 describe("rcon codec", () => {
   it("roundtrip auth", () => {

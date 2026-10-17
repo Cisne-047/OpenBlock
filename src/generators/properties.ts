@@ -1,4 +1,4 @@
-import type { ServerConfig } from "../types";
+import type { ServerConfig } from "../types.js";
 
 function escPropValue(v: string): string {
   return v.replace(/\\/g, "\\\\").replace(/\n/g, "\\n");

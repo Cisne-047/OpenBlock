@@ -1,13 +1,13 @@
 import { parseArgs } from "node:util";
 import { existsSync, readFileSync } from "node:fs";
 import { basename, isAbsolute, join, resolve } from "node:path";
-import { latestRelease } from "./api/mojang";
-import { applyConfig, ensureRconPassword, runBackup, stopServer } from "./apply";
-import { detectHardware } from "./hw/detect";
-import { classifyHardware, recommendedRamMB } from "./hw/tiers";
-import { HELP } from "./help";
-import type { EngineId, PerfProfile, ServerConfig } from "./types";
-import { c, confirm, kvTable } from "./ui";
+import { latestRelease } from "./api/mojang.js";
+import { applyConfig, ensureRconPassword, runBackup, stopServer } from "./apply.js";
+import { detectHardware } from "./hw/detect.js";
+import { classifyHardware, recommendedRamMB } from "./hw/tiers.js";
+import { HELP } from "./help.js";
+import type { EngineId, PerfProfile, ServerConfig } from "./types.js";
+import { c, confirm, kvTable } from "./ui.js";
 
 /**
  * Modo avanzado: flags completas + config JSON reimportable. Todo lo del modo

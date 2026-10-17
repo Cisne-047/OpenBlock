@@ -1,4 +1,4 @@
-import { httpJson } from "../net/http";
+import { httpJson } from "../net/http.js";
 
 /**
  * Modrinth API v2. Plugins, mods y modpacks (.mrpack) sin API key.

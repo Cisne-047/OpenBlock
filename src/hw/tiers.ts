@@ -1,4 +1,4 @@
-import type { HardwareProfile, Tier, TierId } from "../types";
+import type { HardwareProfile, Tier, TierId } from "../types.js";
 
 /**
  * Clasificación del hardware en tiers. Sin benchmark usa solo datos duros;

@@ -14,11 +14,17 @@ Misma arquitectura que DistroForge: TypeScript ESM + generadores puros (`FileMap
 ## Uso
 
 ```bash
-# Instalar (repo privado: necesitas acceso y git ya autenticado contra GitHub)
-npm install -g github:Cisne-047/OpenBlock
+# Instalar (repo privado: necesitas acceso)
+git clone https://github.com/Cisne-047/OpenBlock.git
+npm install -g ./OpenBlock
 
 openblock                    # modo guiado (wizard estilo MC)
 ```
+
+`npm install -g ./OpenBlock` compila y deja el comando en el PATH. No se usa
+`npm install -g github:Cisne-047/OpenBlock` porque **npm 12 trae `allow-git`
+desactivado** (`EALLOWGIT`) y esa instalación falla; si lo prefieres, admite
+`--allow-git=all`, pero clonar es una línea y funciona en cualquier versión.
 
 Si trabajas sobre el código, en vez de instalar:
 
@@ -26,6 +32,7 @@ Si trabajas sobre el código, en vez de instalar:
 npm install
 npm run openblock            # mismo wizard, sin instalar nada global
 npm link                     # o esto, para tener el comando `openblock` en el PATH
+npm run build                # compila a dist/ (es lo que se instala)
 ```
 
 ```bash
@@ -109,19 +116,26 @@ src/
 tests/              vitest (86): tiers, flags Aikar exactos, properties, rcon codec,
                     mrpack, doctor, pureza del núcleo, veredicto del self-test y
                     barrido de "undefined"
+dist/               JS compilado (lo que se instala); no se versiona
 ```
 
 `generators/` no importa `node:*` ni lanza: construye contenido y nada más. La E/S
 está en `output.ts` y `apply.ts`. `tests/purity.test.ts` lo comprueba, así que la
 regla no depende de que alguien se acuerde.
 
+El código se escribe en TypeScript y **se publica compilado**: `npm run build`
+emite `dist/` y el `bin` apunta ahí, así que el paquete instalado no necesita
+`tsx` ni ningún cargador. Por eso los imports relativos llevan extensión `.js`
+(aunque el fichero sea `.ts`): es lo que exige Node ESM y lo que hace que el JS
+emitido se resuelva sin ayuda.
+
 ## Verificación
 
 Dos niveles, porque la suite sola no basta:
 
 ```bash
-npm test      # 86 tests: unitarios, sin arrancar ningún server
-npm run smoke # self-test: instala, arranca y diagnostica un Paper de verdad
+npm test                # 86 tests: unitarios, sin arrancar ningún server
+npm run smoke           # compila + self-test: instala, arranca y diagnostica un Paper real
 ```
 
 `self-test` existe por un motivo concreto: la suite pasa sin tocar un JAR, y por

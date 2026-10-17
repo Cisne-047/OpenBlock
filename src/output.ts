@@ -1,6 +1,6 @@
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import type { FileMap } from "./generators";
+import type { FileMap } from "./generators/index.js";
 
 /**
  * E/S del proyecto generado: escribir a disco y empaquetar en zip.

@@ -1,5 +1,5 @@
-import { httpJson } from "../net/http";
-import { USER_AGENT } from "../version";
+import { httpJson } from "../net/http.js";
+import { USER_AGENT } from "../version.js";
 
 /**
  * Resolución de descargas por engine. Cada motor devuelve la URL del jar a

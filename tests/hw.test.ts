@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { classifyHardware, recommendedRamMB } from "../src/hw/tiers";
-import { aikarFlags, gcThreadCounts, jvmFlags, zgcFlags } from "../src/generators/jvm";
-import type { HardwareProfile, TierId } from "../src/types";
+import { classifyHardware, recommendedRamMB } from "../src/hw/tiers.js";
+import { aikarFlags, gcThreadCounts, jvmFlags, zgcFlags } from "../src/generators/jvm.js";
+import type { HardwareProfile, TierId } from "../src/types.js";
 
 const hw = (over: Partial<HardwareProfile> = {}): HardwareProfile => ({
   os: "linux",

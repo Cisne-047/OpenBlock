@@ -1,17 +1,17 @@
 #!/usr/bin/env node
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { advanced, backupCommand, buildAdvancedConfig, parseAdvancedArgs, stopCommand } from "./advanced";
-import { dirFrom, doctorMode, parseFlags } from "./cli";
-import { runBenchmark } from "./hw/bench";
-import { detectHardware } from "./hw/detect";
-import { classifyHardware, recommendedRamMB } from "./hw/tiers";
-import { generateProject } from "./generators";
-import { writeProject, zipProject } from "./output";
-import { guided } from "./guided";
-import { HELP } from "./help";
-import type { ServerConfig } from "./types";
-import { c, kvTable, banner } from "./ui";
+import { advanced, backupCommand, buildAdvancedConfig, parseAdvancedArgs, stopCommand } from "./advanced.js";
+import { dirFrom, doctorMode, parseFlags } from "./cli.js";
+import { runBenchmark } from "./hw/bench.js";
+import { detectHardware } from "./hw/detect.js";
+import { classifyHardware, recommendedRamMB } from "./hw/tiers.js";
+import { generateProject } from "./generators/index.js";
+import { writeProject, zipProject } from "./output.js";
+import { guided } from "./guided.js";
+import { HELP } from "./help.js";
+import type { ServerConfig } from "./types.js";
+import { c, kvTable, banner } from "./ui.js";
 
 async function detectCmd(withBench: boolean): Promise<void> {
   const hw = await detectHardware();
@@ -59,7 +59,7 @@ async function generateCmd(argv: string[]): Promise<void> {
   const a = parseAdvancedArgs(toArgv(values));
   const cfg = await buildAdvancedConfig(a);
   const hw = await detectHardware();
-  const { buildDownloadPlan } = await import("./plan");
+  const { buildDownloadPlan } = await import("./plan.js");
   const plan = await buildDownloadPlan(cfg);
   console.log(c.bold(`\n== Plan == ${plan.engineResolved}`));
   for (const e of plan.entries) console.log(`  ${c.dim(`[${e.kind}]`)} ${e.label}`);
@@ -93,7 +93,7 @@ async function infoCmd(dir: string): Promise<void> {
 }
 
 async function doctorCmd(rest: string[]): Promise<void> {
-  const { runDoctor, printReport } = await import("./doctor");
+  const { runDoctor, printReport } = await import("./doctor.js");
   const { values } = parseFlags(rest, {
     strings: ["dir"],
     booleans: ["json", "yes", "no-boot"],
@@ -140,7 +140,7 @@ async function doctorCmd(rest: string[]): Promise<void> {
 
 async function selfTestCmd(rest: string[]): Promise<void> {
   const { values } = parseFlags(rest, { strings: ["mc", "port"], booleans: ["keep"] });
-  const { runSelfTest } = await import("./selftest");
+  const { runSelfTest } = await import("./selftest.js");
   const code = await runSelfTest({
     mc: typeof values.mc === "string" ? values.mc : undefined,
     port: typeof values.port === "string" ? Number(values.port) : undefined,

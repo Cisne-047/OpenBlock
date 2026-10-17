@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { generateProject, validate } from "../src/generators";
-import { zipProject } from "../src/output";
-import { serverProperties } from "../src/generators/properties";
-import { bukkitYml, paperWorldDefaultsYml, spigotYml } from "../src/generators/paper";
-import { planFor, serverCfg as cfg } from "./helpers";
+import { generateProject, validate } from "../src/generators/index.js";
+import { zipProject } from "../src/output.js";
+import { serverProperties } from "../src/generators/properties.js";
+import { bukkitYml, paperWorldDefaultsYml, spigotYml } from "../src/generators/paper.js";
+import { planFor, serverCfg as cfg } from "./helpers.js";
 
 describe("serverProperties", () => {
   it("tuning base presente", () => {

@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import { createWriteStream } from "node:fs";
 import { pipeline } from "node:stream/promises";
 import { Readable } from "node:stream";
-import { USER_AGENT as UA } from "../version";
+import { USER_AGENT as UA } from "../version.js";
 
 export async function httpJson(url: string, init?: RequestInit): Promise<unknown> {
   const res = await fetch(url, {

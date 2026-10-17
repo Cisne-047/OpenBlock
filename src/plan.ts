@@ -1,12 +1,12 @@
-import { engineById } from "./catalog";
+import { engineById } from "./catalog.js";
 import {
   fabricDownload,
   forgeDownload,
   neoforgeDownload,
   paperFamilyDownload,
   quiltDownload,
-} from "./api/engines";
-import { vanillaServerFor } from "./api/mojang";
+} from "./api/engines.js";
+import { vanillaServerFor } from "./api/mojang.js";
 import {
   curseforgeFileUrl,
   latestVersion,
@@ -14,9 +14,9 @@ import {
   parseMrpackIndex,
   primaryFile,
   type MrpackIndex,
-} from "./api/modrinth";
-import { perfItemsFor } from "./catalog";
-import type { ServerConfig } from "./types";
+} from "./api/modrinth.js";
+import { perfItemsFor } from "./catalog.js";
+import type { ServerConfig } from "./types.js";
 
 /**
  * Manifiesto de descargas: lo resuelven las APIs ANTES de generar el proyecto,
@@ -186,7 +186,7 @@ interface MrpackFetch {
 
 /** descarga y parsea el índice de un .mrpack (URL de página de Modrinth o directa) */
 export async function fetchMrpack(url: string): Promise<MrpackFetch> {
-  const { modrinthModpackFile } = await import("./api/modrinth");
+  const { modrinthModpackFile } = await import("./api/modrinth.js");
   const { file } = await modrinthModpackFile(url);
   const res = await fetch(file.url);
   if (!res.ok) throw new Error(`HTTP ${res.status} bajando ${file.filename}`);

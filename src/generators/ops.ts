@@ -1,4 +1,4 @@
-import type { ServerConfig } from "../types";
+import type { ServerConfig } from "../types.js";
 
 /** Firewall + backups: scripts listos para copiar/programar. */
 

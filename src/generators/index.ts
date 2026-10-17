@@ -1,12 +1,12 @@
-import type { DownloadPlan } from "../plan";
-import type { ServerConfig } from "../types";
-import { engineById, javaMajorFor } from "../catalog";
-import { jvmArgsLine } from "./jvm";
-import { serverProperties } from "./properties";
-import { bukkitYml, paperGlobalYml, paperWorldDefaultsYml, spigotYml } from "./paper";
-import { installPs1, installSh, jvmArgsTxt, startBat, startSh, userJvmArgsTxt } from "./scripts";
-import { installServicePs1, installServiceSh, removeServicePs1, systemdUnit, winswConfig } from "./service";
-import { backupPs1, backupSh, backupTimer, firewallPs1, firewallSh } from "./ops";
+import type { DownloadPlan } from "../plan.js";
+import type { ServerConfig } from "../types.js";
+import { engineById, javaMajorFor } from "../catalog.js";
+import { jvmArgsLine } from "./jvm.js";
+import { serverProperties } from "./properties.js";
+import { bukkitYml, paperGlobalYml, paperWorldDefaultsYml, spigotYml } from "./paper.js";
+import { installPs1, installSh, jvmArgsTxt, startBat, startSh, userJvmArgsTxt } from "./scripts.js";
+import { installServicePs1, installServiceSh, removeServicePs1, systemdUnit, winswConfig } from "./service.js";
+import { backupPs1, backupSh, backupTimer, firewallPs1, firewallSh } from "./ops.js";
 
 export type FileMap = Record<string, string>;
 

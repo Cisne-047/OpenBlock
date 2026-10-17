@@ -1,4 +1,4 @@
-import type { ServerConfig } from "../types";
+import type { ServerConfig } from "../types.js";
 
 /** Servicio autoarrancable: systemd en Linux, WinSW en Windows. */
 

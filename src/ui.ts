@@ -1,5 +1,5 @@
 import readline from "node:readline/promises";
-import { shortVersion } from "./version";
+import { shortVersion } from "./version.js";
 
 const enabled = process.stdout.isTTY && !process.env.NO_COLOR;
 

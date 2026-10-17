@@ -1,5 +1,5 @@
-import type { DownloadPlan } from "../src/plan";
-import type { ServerConfig } from "../src/types";
+import type { DownloadPlan } from "../src/plan.js";
+import type { ServerConfig } from "../src/types.js";
 
 /**
  * Factoría de configs para los tests.

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { engineById, javaMajorFor, parseMc, perfItemsFor, versionKey } from "../src/catalog";
+import { engineById, javaMajorFor, parseMc, perfItemsFor, versionKey } from "../src/catalog.js";
 
 describe("parseMc", () => {
   it("parsea versiones con y sin patch", () => {

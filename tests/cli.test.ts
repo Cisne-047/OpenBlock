@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { dirFrom, doctorMode, parseFlags } from "../src/cli";
+import { dirFrom, doctorMode, parseFlags } from "../src/cli.js";
 
 describe("parseFlags", () => {
   const spec = { strings: ["dir", "zip"], booleans: ["json", "yes"] } as const;

@@ -3,12 +3,12 @@ import { existsSync } from "node:fs";
 import { mkdtemp, readFile, writeFile, rm, mkdir } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { findFreePort, jarNameFromStartScript, rewriteHeapFlags, runDoctor } from "../src/doctor";
-import { ctxFor, doctorCfg as cfg } from "./helpers";
+import { findFreePort, jarNameFromStartScript, rewriteHeapFlags, runDoctor } from "../src/doctor.js";
+import { ctxFor, doctorCfg as cfg } from "./helpers.js";
 
 describe("reglas de log", () => {
   it("detecta Java incorrecto y ofrece fix automático", async () => {
-    const { LOG_RULES } = await import("../src/doctor");
+    const { LOG_RULES } = await import("../src/doctor.js");
     const ctx = ctxFor();
     const rule = LOG_RULES.find((r) => r.code === "JAVA_VERSION")!;
     const m = "Minecraft 26.1 and newer requires running the server with Java 25 or above.".match(rule.pattern)!;
@@ -18,7 +18,7 @@ describe("reglas de log", () => {
   });
 
   it("detecta puerto ocupado: fix considerable (pregunta)", async () => {
-    const { LOG_RULES } = await import("../src/doctor");
+    const { LOG_RULES } = await import("../src/doctor.js");
     const rule = LOG_RULES.find((r) => r.code === "PORT_IN_USE")!;
     const m = "Failed to bind to port!".match(rule.pattern)!;
     const fix = rule.fix!(m, ctxFor())!;
@@ -26,7 +26,7 @@ describe("reglas de log", () => {
   });
 
   it("detecta OOM: subida de RAM considerable", async () => {
-    const { LOG_RULES } = await import("../src/doctor");
+    const { LOG_RULES } = await import("../src/doctor.js");
     const rule = LOG_RULES.find((r) => r.code === "OOM")!;
     const m = "java.lang.OutOfMemoryError: Java heap space".match(rule.pattern)!;
     const fix = rule.fix!(m, ctxFor())!;
@@ -35,7 +35,7 @@ describe("reglas de log", () => {
   });
 
   it("Can't keep up es warning con fix de view-distance", async () => {
-    const { LOG_RULES } = await import("../src/doctor");
+    const { LOG_RULES } = await import("../src/doctor.js");
     const rule = LOG_RULES.find((r) => r.code === "TICK_BEHIND")!;
     expect(rule.severity).toBe("warning");
     const m = "Can't keep up! Is the server overloaded? Running 3000ms or 60 ticks behind".match(rule.pattern)!;
@@ -44,7 +44,7 @@ describe("reglas de log", () => {
   });
 
   it("plugin roto: fix considerable que mueve a plugins_disabled", async () => {
-    const { LOG_RULES } = await import("../src/doctor");
+    const { LOG_RULES } = await import("../src/doctor.js");
     const rule = LOG_RULES.find((r) => r.code === "PLUGIN_CRASH")!;
     const m = "Error occurred while enabling Chunky v1.5.3".match(rule.pattern)!;
     expect(rule.fix!(m, ctxFor())!.considerable).toBe(true);
@@ -55,7 +55,7 @@ describe("reglas estáticas + fixes reales", () => {
   it("eula ausente: fix auto escribe eula=true", async () => {
     const dir = await mkdtemp(join(tmpdir(), "ob-doctor-"));
     try {
-      const { STATIC_RULES } = await import("../src/doctor");
+      const { STATIC_RULES } = await import("../src/doctor.js");
       const ctx = { cfg: cfg({ serverDir: dir }), dir, logLines: [], bootTested: false, bootOk: false };
       const rule = STATIC_RULES.find((r) => r.code === "EULA_FILE")!;
       const f = await rule.check(ctx);
@@ -73,7 +73,7 @@ describe("reglas estáticas + fixes reales", () => {
     const dir = await mkdtemp(join(tmpdir(), "ob-doctor-"));
     try {
       await writeFile(join(dir, "server.properties"), "sync-chunk-writes=true\nview-distance=8\n");
-      const { STATIC_RULES } = await import("../src/doctor");
+      const { STATIC_RULES } = await import("../src/doctor.js");
       const ctx = { cfg: cfg({ serverDir: dir }), dir, logLines: [], bootTested: false, bootOk: false };
       const rule = STATIC_RULES.find((r) => r.code === "SYNC_CHUNK_WRITES")!;
       const f = await rule.check(ctx);
@@ -89,7 +89,7 @@ describe("reglas estáticas + fixes reales", () => {
     const dir = await mkdtemp(join(tmpdir(), "ob-doctor-"));
     try {
       await writeFile(join(dir, "server.properties"), "enable-rcon=true\nrcon.password=\nrcon.port=25575\n");
-      const { STATIC_RULES } = await import("../src/doctor");
+      const { STATIC_RULES } = await import("../src/doctor.js");
       const ctx = { cfg: cfg({ serverDir: dir }), dir, logLines: [], bootTested: false, bootOk: false };
       const rule = STATIC_RULES.find((r) => r.code === "RCON_PASSWORD")!;
       const f = await rule.check(ctx);
@@ -106,7 +106,7 @@ describe("reglas estáticas + fixes reales", () => {
     const dir = await mkdtemp(join(tmpdir(), "ob-doctor-"));
     try {
       await mkdir(join(dir, "plugins"), { recursive: true });
-      const { STATIC_RULES } = await import("../src/doctor");
+      const { STATIC_RULES } = await import("../src/doctor.js");
       const ctx = { cfg: cfg({ serverDir: dir }), dir, logLines: [], bootTested: false, bootOk: false };
       const rule = STATIC_RULES.find((r) => r.code === "ENGINE_JAR_MISSING")!;
       const f = await rule.check(ctx);

@@ -1,4 +1,4 @@
-import { httpJson } from "../net/http";
+import { httpJson } from "../net/http.js";
 
 const MANIFEST = "https://piston-meta.mojang.com/mc/game/version_manifest_v2.json";
 

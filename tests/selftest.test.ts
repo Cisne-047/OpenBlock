@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { evaluateSelfTest, selfTestConfig } from "../src/selftest";
-import type { DoctorReport } from "../src/doctor";
+import { evaluateSelfTest, selfTestConfig } from "../src/selftest.js";
+import type { DoctorReport } from "../src/doctor.js";
 
 /**
  * El veredicto del self-test es lo único que decide si CI pasa o falla, así que

@@ -1,6 +1,6 @@
-import type { DownloadPlan } from "../plan";
-import type { ServerConfig } from "../types";
-import { USER_AGENT } from "../version";
+import type { DownloadPlan } from "../plan.js";
+import type { ServerConfig } from "../types.js";
+import { USER_AGENT } from "../version.js";
 
 /**
  * Scripts de arranque e instalación autocontenidos: el server generado se

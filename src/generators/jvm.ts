@@ -1,4 +1,4 @@
-import type { ServerConfig } from "../types";
+import type { ServerConfig } from "../types.js";
 
 /**
  * Flags de JVM. G1GC sintonizado con los flags de Aikar (fórmulas exactas de

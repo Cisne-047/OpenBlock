@@ -2,7 +2,7 @@ import { execFile } from "node:child_process";
 import { chmod, mkdir, readdir } from "node:fs/promises";
 import os from "node:os";
 import { dirname, join } from "node:path";
-import { downloadTo } from "./net/http";
+import { downloadTo } from "./net/http.js";
 import { promisify } from "node:util";
 
 const exec = promisify(execFile);

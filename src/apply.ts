@@ -3,15 +3,15 @@ import { randomBytes } from "node:crypto";
 import { existsSync, mkdirSync } from "node:fs";
 import { appendFile, copyFile, mkdir, readFile, stat, writeFile } from "node:fs/promises";
 import { basename, dirname, join, resolve } from "node:path";
-import { javaMajorFor } from "./catalog";
-import { ensureJava } from "./java";
-import { downloadTo, fmtBytes } from "./net/http";
-import { buildDownloadPlan, type DownloadPlan } from "./plan";
-import { withRcon } from "./rcon";
-import { achievement, c, progressBar } from "./ui";
-import { generateProject, validate } from "./generators";
-import { writeProject } from "./output";
-import type { ServerConfig } from "./types";
+import { javaMajorFor } from "./catalog.js";
+import { ensureJava } from "./java.js";
+import { downloadTo, fmtBytes } from "./net/http.js";
+import { buildDownloadPlan, type DownloadPlan } from "./plan.js";
+import { withRcon } from "./rcon.js";
+import { achievement, c, progressBar } from "./ui.js";
+import { generateProject, validate } from "./generators/index.js";
+import { writeProject } from "./output.js";
+import type { ServerConfig } from "./types.js";
 
 /**
  * apply: convierte config + plan en un server REAL en disco. Deja start.sh /

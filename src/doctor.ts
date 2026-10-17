@@ -3,11 +3,11 @@ import { existsSync, readFileSync } from "node:fs";
 import { mkdir, readFile, readdir, rename, rm, writeFile } from "node:fs/promises";
 import net from "node:net";
 import { join, resolve } from "node:path";
-import { javaMajorFor } from "./catalog";
-import { ensureJava, javaMajorOf } from "./java";
-import { latestVersion, primaryFile } from "./api/modrinth";
-import { c } from "./ui";
-import type { ServerConfig } from "./types";
+import { javaMajorFor } from "./catalog.js";
+import { ensureJava, javaMajorOf } from "./java.js";
+import { latestVersion, primaryFile } from "./api/modrinth.js";
+import { c } from "./ui.js";
+import type { ServerConfig } from "./types.js";
 
 /**
  * Doctor: la "pequeña IA" de OpenBlock. Hace un dry-run real del server
@@ -356,7 +356,7 @@ export const STATIC_RULES: StaticRule[] = [
                 apply: async () => {
                   const file = primaryFile(v);
                   await rm(join(ctx.dir, "plugins", f), { force: true });
-                  const { downloadTo } = await import("./net/http");
+                  const { downloadTo } = await import("./net/http.js");
                   await downloadTo(file.url, join(ctx.dir, "plugins", file.filename), { sha512: file.hashes?.sha512 });
                 },
               },
@@ -484,7 +484,7 @@ async function bootTest(cfg: ServerConfig, dir: string, capture: (line: string) 
   // apagado: limpio por RCON si está arriba, kill si no
   if (done && cfg.rcon.enabled) {
     try {
-      const { withRcon } = await import("./rcon");
+      const { withRcon } = await import("./rcon.js");
       await withRcon("127.0.0.1", cfg.rcon.port, cfg.rcon.password, (r) => r.command("stop"));
       await new Promise((r) => setTimeout(r, 8000));
     } catch {
@@ -586,7 +586,7 @@ export async function runDoctor(
       console.log(c.cyan(`  ⚙ ${f.fix.description}...`));
       await f.fix.apply();
       applied.push(f.fix.code);
-    } else if (opts.interactive && (await (await import("./ui")).confirm(c.yellow(`  ¿${f.fix.description}?`), false))) {
+    } else if (opts.interactive && (await (await import("./ui.js")).confirm(c.yellow(`  ¿${f.fix.description}?`), false))) {
       await f.fix.apply();
       applied.push(f.fix.code);
     } else {

@@ -1,4 +1,4 @@
-import type { EngineId, LoaderKind } from "./types";
+import type { EngineId, LoaderKind } from "./types.js";
 
 export interface EngineDef {
   id: EngineId;
