@@ -1,0 +1,43 @@
+{
+  "name": "paridad",
+  "mcVersion": "1.20.4",
+  "engine": "paper",
+  "serverDir": "/tmp/paridad",
+  "ramMB": 8192,
+  "players": 24,
+  "viewDistance": 8,
+  "simulationDistance": 6,
+  "port": 25565,
+  "motd": "paridad byte a byte \\ con barra",
+  "difficulty": "normal",
+  "gamemode": "survival",
+  "worldType": "normal",
+  "seed": "openblock",
+  "onlineMode": true,
+  "whitelist": false,
+  "pvp": true,
+  "hardcore": false,
+  "modpack": {
+    "kind": "none",
+    "url": ""
+  },
+  "performance": "aggressive",
+  "pregenRadius": 4000,
+  "backup": {
+    "enabled": true,
+    "intervalHours": 24,
+    "keep": 7
+  },
+  "service": {
+    "enabled": true,
+    "user": "minecraft"
+  },
+  "rcon": {
+    "enabled": true,
+    "password": "secreto1234",
+    "port": 25575
+  },
+  "chunkyborder": false,
+  "targetOS": "both",
+  "customItems": []
+}

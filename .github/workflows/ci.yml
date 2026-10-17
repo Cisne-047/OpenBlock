@@ -26,6 +26,44 @@ jobs:
       - name: Tests
         run: npm test
 
+  rust:
+    # Paridad del núcleo Rust contra el TS. El golden lo genera el TypeScript, así
+    # que si alguien cambia un generador en un lado y no en el otro, esto falla y
+    # dice el fichero, la línea y el byte. Mismo gate que el clippy de DistroForge.
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: rust
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Node 20 (el golden lo genera el TS)
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - name: Toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+      - name: Dependencias del TS
+        run: npm ci
+        working-directory: .
+      - name: Regenera el golden de paridad
+        run: npm run parity:golden
+        working-directory: .
+      - name: El golden está al día (si no, el TS cambió y no se regeneró)
+        run: git diff --exit-code -- rust/crates/forge-core/tests/golden
+        working-directory: .
+      - name: Tests del núcleo
+        run: cargo test
+      - name: Clippy
+        run: cargo clippy --all-targets -- -D warnings
+      - name: Formato
+        run: cargo fmt --check
+
   smoke:
     # Instala un Paper de verdad, lo arranca y lo diagnostica. Es el único job que
     # toca un server real: la suite unitaria nunca arranca uno, y por ahí se coló

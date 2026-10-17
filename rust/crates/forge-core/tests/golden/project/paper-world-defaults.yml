@@ -1,0 +1,24 @@
+chunks:
+  auto-save-interval: 6000
+  delay-chunk-unload-by: 10s
+  fixed-chunk-inhabited-time: -1
+  max-auto-save-chunks-per-tick: 24
+  prevent-moving-into-unloaded-chunks: false
+entities:
+  behavior:
+    optimize-explosions: true
+  spawning:
+    alt-item-despawn-rate:
+      enabled: true
+      items:
+        COBBLESTONE: 300
+    per-player-mob-spawns: true
+hopper:
+  cooldown-when-full: true
+  disable-move-event: false
+misc:
+  redstone-implementation: ALTERNATE_CURRENT
+  random-light-updates: false
+tick-rates:
+  container-update: 1
+  mob-spawner: 2

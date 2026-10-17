@@ -3,6 +3,9 @@ dist/
 coverage/
 *.log
 
+# Rust: el target de compilación no se versiona (el fuente y el golden sí)
+rust/target/
+
 # Proyecto generado en local (generate/advanced sin --dir apuntando fuera)
 openblock-work/
 

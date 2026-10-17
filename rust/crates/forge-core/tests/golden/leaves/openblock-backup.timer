@@ -1,0 +1,9 @@
+[Unit]
+Description=OpenBlock backup paridad
+
+[Timer]
+OnCalendar=*-*-* 0/24:00:00
+Persistent=true
+
+[Install]
+WantedBy=timers.target

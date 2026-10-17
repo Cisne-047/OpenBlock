@@ -1,0 +1,18 @@
+[Unit]
+Description=OpenBlock server paridad (paper 1.20.4)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/openblock/paridad
+User=minecraft
+ExecStart=/opt/openblock/paridad/start.sh
+Restart=on-failure
+RestartSec=10
+SuccessExitStatus=0 143
+# apagado limpio: stop envía "stop" por rcon antes de SIGTERM
+TimeoutStopSec=90
+
+[Install]
+WantedBy=multi-user.target

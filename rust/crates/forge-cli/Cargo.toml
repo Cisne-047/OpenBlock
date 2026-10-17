@@ -1,0 +1,14 @@
+[package]
+name = "forge-cli"
+description = "CLI de OpenBlock en Rust (en construcción)."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "forge"
+path = "src/main.rs"
+
+[dependencies]
+forge-core = { path = "../forge-core" }
+serde_json.workspace = true

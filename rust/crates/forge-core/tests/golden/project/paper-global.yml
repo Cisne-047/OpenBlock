@@ -1,0 +1,13 @@
+chunk-loading-advanced:
+  auto-config-send-distance: false
+  player-max-concurrent-chunk-generates: 0
+  player-max-concurrent-chunk-loads: 0
+chunk-system:
+  gen-parallelism: default
+  io-threads: -1
+  worker-threads: -1
+misc:
+  region-file-cache-size: 256
+watchdog:
+  early-warning-delay: 10000
+  early-warning-every: 5000

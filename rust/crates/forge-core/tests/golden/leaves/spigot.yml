@@ -1,0 +1,21 @@
+settings:
+  log-villager-deaths: true
+  netty-threads: 4
+  timeout-time: 60
+  restart-on-crash: true
+  restart-script: ./start.sh
+world-settings:
+  default:
+    arrow-despawn-rate: 300
+    entity-activation-range:
+      animals: 16
+      monsters: 24
+      raiders: 32
+      misc: 8
+      tick-inactive-villagers: true
+    item-despawn-rate: 6000
+    merge-radius:
+      item: 2.5
+      exp: 3.0
+    max-tnt-per-tick: 50
+    verbose: false
