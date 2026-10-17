@@ -13,6 +13,7 @@
 //! el doctor todavía no están portados.
 
 mod detect;
+mod rcon;
 
 use std::fs;
 use std::path::Path;
@@ -24,6 +25,7 @@ fn uso() -> ExitCode {
     eprintln!("  detect [--json]                 hardware detectado (JSON igual que el TS)");
     eprintln!("  dump <config> <plan> <dir> [n]  genera el proyecto desde config y plan");
     eprintln!("  latest                          última release de Minecraft (consulta Mojang)");
+    eprintln!("  rcon <host> <puerto> <comando>  manda un comando por RCON (pass: OPENBLOCK_RCON_PASSWORD)");
     eprintln!();
     eprintln!("El plan se obtiene del CLI de TypeScript: `openblock generate` lo escribe.");
     ExitCode::from(2)
@@ -35,7 +37,44 @@ fn main() -> ExitCode {
         Some("detect") => detect_cmd(&args[1..]),
         Some("dump") => dump_cmd(&args[1..]),
         Some("latest") => latest_cmd(),
+        Some("rcon") => rcon_cmd(&args[1..]),
         _ => uso(),
+    }
+}
+
+/// `forge rcon <host> <puerto> <comando>` — manda un comando a un server por RCON.
+///
+/// La contraseña se lee de `OPENBLOCK_RCON_PASSWORD` y **no** de un argumento: en
+/// la línea de comandos quedaría visible en el listado de procesos de la máquina.
+/// Es la misma razón por la que el doctor la lee de `openblock.json`.
+fn rcon_cmd(args: &[String]) -> ExitCode {
+    if args.len() < 3 {
+        eprintln!("uso: forge rcon <host> <puerto> <comando>");
+        eprintln!("  la contraseña se lee de OPENBLOCK_RCON_PASSWORD");
+        return ExitCode::from(2);
+    }
+    let puerto: u16 = match args[1].parse() {
+        Ok(p) => p,
+        Err(_) => {
+            eprintln!("Puerto inválido: {}", args[1]);
+            return ExitCode::from(2);
+        }
+    };
+    let comando = args[2..].join(" ");
+    let Ok(password) = std::env::var("OPENBLOCK_RCON_PASSWORD") else {
+        eprintln!("Falta OPENBLOCK_RCON_PASSWORD: la contraseña no se pasa por argumento");
+        return ExitCode::from(2);
+    };
+
+    match rcon::with_rcon(&args[0], puerto, &password, |r| r.command(&comando)) {
+        Ok(salida) => {
+            println!("{salida}");
+            ExitCode::SUCCESS
+        }
+        Err(e) => {
+            eprintln!("{e}");
+            ExitCode::FAILURE
+        }
     }
 }
 

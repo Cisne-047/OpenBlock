@@ -36,6 +36,7 @@ vigila al otro lado. `forge-api` es el único que hace red, igual que en el TS s
 | `hw::tiers` | portado |
 | `hw::detect` | portado, en el CLI (toca el sistema) |
 | `rcon` (códec) | portado |
+| `rcon` (cliente, socket) | portado, en el CLI |
 | `hw::bench` | portado: el score, el xorshift y la medición |
 | `api::mojang` | portado (red + parte pura con fixture) |
 | `modrinth` (parsers de modpack) | portado |
