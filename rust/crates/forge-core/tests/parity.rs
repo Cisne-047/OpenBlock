@@ -67,6 +67,48 @@ fn assert_paridad(nombre: &str, esperado: &str, obtenido: &str) {
     );
 }
 
+/// `generateProject` completo, fichero a fichero, contra el golden del TS.
+///
+/// Es la prueba de verdad del núcleo: 23 ficheros que incluyen los `start.sh`,
+/// `install.sh`, `install.ps1` y el README, donde un solo carácter de diferencia
+/// —un salto, un escape, una llave de PowerShell— rompe el server del usuario.
+#[test]
+fn paridad_del_proyecto_completo() {
+    let golden_dir = repo_root().join("rust/crates/forge-core/tests/golden");
+    let cfg = fixture();
+    let plan: forge_core::plan::DownloadPlan =
+        serde_json::from_str(&fs::read_to_string(golden_dir.join("plan.json")).expect("plan.json"))
+            .expect("plan inválido");
+    let cores: u32 = fs::read_to_string(golden_dir.join("cores.txt"))
+        .expect("cores.txt")
+        .trim()
+        .parse()
+        .expect("cores");
+
+    let obtenido = forge_core::generators::generate_project(&cfg, &plan, cores);
+
+    // los nombres tienen que coincidir exactamente: ni de más ni de menos
+    let project_dir = golden_dir.join("project");
+    let mut esperados: Vec<String> = fs::read_dir(&project_dir)
+        .expect("golden/project")
+        .filter_map(|e| e.ok().map(|e| e.file_name().to_string_lossy().into_owned()))
+        .collect();
+    esperados.sort();
+    let mios: Vec<String> = obtenido.keys().cloned().collect();
+    assert_eq!(
+        mios, esperados,
+        "el conjunto de ficheros generados no coincide"
+    );
+
+    for nombre in &esperados {
+        let esperado = fs::read_to_string(project_dir.join(nombre)).expect("golden");
+        let mio = obtenido.get(nombre).expect("generado");
+        if esperado != *mio {
+            assert_paridad(nombre, &esperado, mio);
+        }
+    }
+}
+
 #[test]
 fn paridad_generadores_de_hoja() {
     let cfg = fixture();

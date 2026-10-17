@@ -28,10 +28,15 @@ vigila al otro lado.
 | `generators::ops` | portado |
 | `generators::service` | portado |
 | `catalog` | portado |
-| `generators::scripts` | pendiente |
-| `generators` (raíz, `generateProject`) | pendiente |
+| `plan` (modelo) | portado |
+| `generators::scripts` | portado |
+| `generators` (raíz, `generateProject`) | portado |
 | `hw` (detección y tiers) | pendiente |
-| `plan` y `api` | pendiente |
+| `plan`/`api` (resolver contra las APIs) | pendiente |
+| CLI y doctor | pendiente |
+
+**El núcleo generador está completo y con paridad byte a byte**: los 23 ficheros
+del proyecto salen idénticos al TypeScript, `openblock.json` incluido.
 
 ## Paridad
 
@@ -41,6 +46,7 @@ genera el TS y lo consume Rust:
 ```bash
 npm run parity          # regenera el golden y corre los tests de Rust
 cargo test              # solo los tests, con el golden ya generado
+forge dump <cfg.json> <plan.json> <dir> [cores]   # proyecto a disco, para diff -r
 ```
 
 Es el `diff -r` que DistroForge documenta como procedimiento manual, pero
@@ -54,8 +60,23 @@ paridad rota en «jvm-args.txt» (línea 1, byte 305)
   longitudes: TS 612 / Rust 612
 ```
 
-El CI regenera el golden y comprueba con `git diff --exit-code` que está al día,
-así que la paridad no puede derivar en silencio.
+Se comprueban las dos cosas: los generadores de hoja por separado (para que el
+fallo señale cuál) y el `generateProject` completo fichero a fichero (para que
+nada se quede sin comparar). El CI regenera el golden y comprueba con
+`git diff --exit-code` que está al día, así que la paridad no puede derivar en
+silencio.
+
+Lo que la paridad ha cazado, y que ninguna lectura del código habría visto:
+
+- **Los acrónimos de serde**: `ram_mb` sale `ramMb` y el JSON dice `ramMB`;
+  `target_os` sale `targetOs` y dice `targetOS`; `disk_m_bs` sale `diskMbS` y dice
+  `diskMBs`. Tres `rename` explícitos. Sin esto, `openblock.json` no reimporta.
+- **El regex de `parseMc`**, tres veces. Mis tres lecturas eran falsas.
+- **Dos líneas en blanco de diferencia** en `install.sh` e `install.ps1`. No era
+  lógica: cuando **no** hay installer, la línea de apertura del ternario del
+  template literal de TS (`` `${plan.installer ``) consume un salto, así que la
+  salida lleva una línea en blanco de más. Un byte de diferencia en un script que
+  el usuario va a ejecutar.
 
 ## Divergencias conocidas
 

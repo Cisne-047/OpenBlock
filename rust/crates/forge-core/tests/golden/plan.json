@@ -1,0 +1,19 @@
+{
+  "entries": [
+    {
+      "kind": "engine",
+      "label": "Paper",
+      "url": "https://example/paper-1.20.4-100.jar",
+      "dest": "paper-1.20.4-100.jar"
+    },
+    {
+      "kind": "plugin",
+      "label": "spark",
+      "url": "https://example/spark.jar",
+      "dest": "plugins/spark.jar"
+    }
+  ],
+  "engineFilename": "paper-1.20.4-100.jar",
+  "engineResolved": "build 100",
+  "localCopies": []
+}

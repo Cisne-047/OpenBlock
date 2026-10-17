@@ -63,6 +63,10 @@ mkdirSync(join(golden, "project"), { recursive: true });
 for (const [nombre, contenido] of Object.entries(proyecto)) {
   writeFileSync(join(golden, "project", nombre), contenido, "utf8");
 }
+// El plan entra en el golden porque `generateProject` lo necesita: los scripts
+// llevan sus URLs y hashes. Así Rust no tiene que adivinar de dónde salen.
+writeFileSync(join(golden, "plan.json"), JSON.stringify(plan, null, 2) + "\n", "utf8");
+writeFileSync(join(golden, "cores.txt"), String(cores) + "\n", "utf8");
 
 // Catálogo: las tablas enteras, no solo el comportamiento. Aquí es donde se cuela
 // una errata en una `desc` o un `reason` que ningún test de comportamiento ve.

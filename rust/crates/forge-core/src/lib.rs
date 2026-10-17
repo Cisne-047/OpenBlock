@@ -24,10 +24,26 @@
 
 pub mod catalog;
 pub mod generators;
+pub mod plan;
 pub mod types;
 
 pub use catalog::LoaderKind;
 pub use types::{EngineId, PerfProfile, ServerConfig, TargetOs};
+
+/// Versión del núcleo.
+///
+/// Sale del `Cargo.toml`, que es el mismo 0.1.0 que el `package.json` del TS: en
+/// el TS la versión está declarada una vez en `src/version.ts` y un test la
+/// compara con `package.json`; aquí la declara el propio manifiesto, así que no
+/// puede desincronizarse.
+pub const VERSION: &str = env!("CARGO_PKG_VERSION");
+
+/// Identificador con el que nos presentamos a las APIs de terceros.
+pub const USER_AGENT: &str = concat!(
+    "OpenBlock/",
+    env!("CARGO_PKG_VERSION"),
+    " (+https://github.com/cisne-047)"
+);
 
 /// Mapa de ficheros generados: ruta relativa → contenido.
 ///
