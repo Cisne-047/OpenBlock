@@ -21,7 +21,16 @@ import { installServicePs1, installServiceSh, removeServicePs1, systemdUnit, win
 import { ENGINES, PERF_ITEMS, javaMajorFor, parseMc, perfItemsFor } from "../src/catalog.js";
 import { TIERS, classifyHardware, recommendedGc, recommendedRamMB } from "../src/hw/tiers.js";
 import { encodePacket } from "../src/rcon.js";
-import { cfLoaderKind, mrpackServerFiles, parseCfManifest, parseMrpackIndex } from "../src/api/modrinth.js";
+import {
+  cfLoaderKind,
+  modrinthModpackSlug,
+  modrinthVersionFrom,
+  modrinthVersionParams,
+  mrpackServerFiles,
+  parseCfManifest,
+  parseMrpackIndex,
+  primaryFile,
+} from "../src/api/modrinth.js";
 import {
   fabricDownloadFrom,
   fabricInstallerVersionsFrom,
@@ -43,8 +52,7 @@ import {
   quiltInstallerVersionsFrom,
   quiltLoaderVersionsFrom,
 } from "../src/api/engines.js";
-import { planFor } from "./helpers.js";
-import type { HardwareProfile, ServerConfig } from "../src/types.js";
+import { planFor } from "./helpers.js";import type { HardwareProfile, ServerConfig } from "../src/types.js";
 
 const raiz = join(fileURLToPath(new URL(".", import.meta.url)), "..");
 const golden = join(raiz, "rust", "crates", "forge-core", "tests", "golden");
@@ -613,6 +621,84 @@ const goldenEngines = (() => {
 })();
 mkdirSync(goldenApi, { recursive: true });
 writeFileSync(join(goldenApi, "engines.json"), JSON.stringify(goldenEngines, null, 2) + "\n", "utf8");
+
+// Cliente de Modrinth: la query y la elección de fichero. Mismo criterio que en
+// engines — se compara la salida serializada entera, orden de claves incluido.
+//
+// Los ficheros de los fixtures llevan SOLO los campos del struct de Rust y en su
+// orden (`url`, `filename`, `hashes`, `primary`): `primaryFile` devuelve el objeto
+// original, así que `JSON.stringify` escribe las claves del fixture tal cual, y en
+// Rust las escribe el struct. Con un campo de más, la comparación fallaría por una
+// diferencia que no existe en el producto.
+const goldenModrinth = (() => {
+  const captura = (nombre: string, args: unknown[], fn: () => unknown) => {
+    try {
+      return { nombre, args, salida_json: JSON.stringify(fn()) ?? "null", error: null as string | null };
+    } catch (e) {
+      return { nombre, args, salida_json: null, error: e instanceof Error ? e.message : String(e) };
+    }
+  };
+  const caso1 = <A>(nombre: string, a1: A, fn: (a1: A) => unknown) => captura(nombre, [a1], () => fn(a1));
+  const caso2 = <A, B>(nombre: string, a1: A, a2: B, fn: (a1: A, a2: B) => unknown) => captura(nombre, [a1, a2], () => fn(a1, a2));
+
+  const fichero = (url: string, filename: string, sha512?: string, primary?: boolean) => ({
+    url,
+    filename,
+    ...(sha512 === undefined ? {} : { hashes: { sha512 } }),
+    ...(primary === undefined ? {} : { primary }),
+  });
+  const version = (files: Array<ReturnType<typeof fichero>>) => ({
+    id: "v1",
+    version_number: "1.0",
+    game_versions: ["1.20.1"],
+    loaders: ["paper"],
+    files,
+  });
+  const conPrimario = version([fichero("https://cdn/a.jar", "a.jar", "aaa", false), fichero("https://cdn/b.jar", "b.jar", "bbb", true)]);
+  const sinPrimario = version([fichero("https://cdn/a.jar", "a.jar"), fichero("https://cdn/b.jar", "b.jar")]);
+  const sinFicheros = version([]);
+
+  return {
+    latest_version_params: [
+      caso1("con las dos listas", { gameVersions: ["1.20.1"], loaders: ["paper"] }, (o) => modrinthVersionParams(o)),
+      caso1("solo game versions", { gameVersions: ["1.20.1"] }, (o) => modrinthVersionParams(o)),
+      caso1("solo loaders", { loaders: ["fabric", "quilt"] }, (o) => modrinthVersionParams(o)),
+      caso1("vacías", { gameVersions: [], loaders: [] }, (o) => modrinthVersionParams(o)),
+      caso1("sin nada", {}, (o) => modrinthVersionParams(o)),
+      // el espacio va como `+` y `~*` no se escapan: no es `encodeURIComponent`
+      caso1("valores raros", { gameVersions: ["a b", "~*", "ñ"] }, (o) => modrinthVersionParams(o)),
+    ],
+    modrinth_version_from: [
+      caso2("lista de una", [version([fichero("https://cdn/a.jar", "a.jar", "aaa", true)])], "sodium", (l, slug) =>
+        modrinthVersionFrom(l, slug)
+      ),
+      caso2("lista vacía", [], "sodium", (l, slug) => modrinthVersionFrom(l, slug)),
+      caso2("no es lista", { version: 1 }, "sodium", (l, slug) => modrinthVersionFrom(l as never, slug)),
+      // se queda con la primera, no con la más nueva
+      caso2(
+        "varias",
+        [version([fichero("https://cdn/1.jar", "1.jar")]), { ...version([fichero("https://cdn/2.jar", "2.jar")]), id: "v2" }],
+        "sodium",
+        (l, slug) => modrinthVersionFrom(l, slug)
+      ),
+    ],
+    primary_file: [
+      caso1("con primario", conPrimario, (v) => primaryFile(v)),
+      caso1("sin primario", sinPrimario, (v) => primaryFile(v)),
+      caso1("sin ficheros", sinFicheros, (v) => primaryFile(v)),
+    ],
+    modrinth_modpack_slug: [
+      "https://modrinth.com/modpack/fabulously-optimized",
+      "https://modrinth.com/project/sodium",
+      "https://modrinth.com/modpack/a",
+      "https://modrinth.com/mod/blabla",
+      "sodium",
+      "",
+      "https://modrinth.com/modpack/ñandú",
+    ].map((entrada) => ({ entrada, salida: modrinthModpackSlug(entrada) })),
+  };
+})();
+writeFileSync(join(goldenApi, "modrinth.json"), JSON.stringify(goldenModrinth, null, 2) + "\n", "utf8");
 
 console.log(
   `golden: ${Object.keys(sueltos).length} generadores de hoja + ${Object.keys(proyecto).length} ficheros de proyecto + catálogo + ${tiersGolden.casos.length} perfiles + ${rconGolden.casos.length} paquetes RCON + ${benchGolden.cpuScore.length} scores + ${modpackGolden.mrpack.length + modpackGolden.curseforge.length + modpackGolden.noModpack.length} casos de modpack + ${doctorGolden.scores.length} scores del doctor + ${goldenEngines.encode_uri_component.length + Object.values(goldenEngines).reduce((n, v) => n + (Array.isArray(v) ? v.length : 0), 0)} casos de engines`

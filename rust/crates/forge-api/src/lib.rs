@@ -10,6 +10,7 @@
 
 pub mod engines;
 pub mod js;
+pub mod modrinth;
 pub mod mojang;
 pub mod net;
 pub mod url;

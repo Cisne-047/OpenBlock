@@ -1,0 +1,283 @@
+{
+  "latest_version_params": [
+    {
+      "nombre": "con las dos listas",
+      "args": [
+        {
+          "gameVersions": [
+            "1.20.1"
+          ],
+          "loaders": [
+            "paper"
+          ]
+        }
+      ],
+      "salida_json": "\"game_versions=%5B%221.20.1%22%5D&loaders=%5B%22paper%22%5D\"",
+      "error": null
+    },
+    {
+      "nombre": "solo game versions",
+      "args": [
+        {
+          "gameVersions": [
+            "1.20.1"
+          ]
+        }
+      ],
+      "salida_json": "\"game_versions=%5B%221.20.1%22%5D\"",
+      "error": null
+    },
+    {
+      "nombre": "solo loaders",
+      "args": [
+        {
+          "loaders": [
+            "fabric",
+            "quilt"
+          ]
+        }
+      ],
+      "salida_json": "\"loaders=%5B%22fabric%22%2C%22quilt%22%5D\"",
+      "error": null
+    },
+    {
+      "nombre": "vacías",
+      "args": [
+        {
+          "gameVersions": [],
+          "loaders": []
+        }
+      ],
+      "salida_json": "\"\"",
+      "error": null
+    },
+    {
+      "nombre": "sin nada",
+      "args": [
+        {}
+      ],
+      "salida_json": "\"\"",
+      "error": null
+    },
+    {
+      "nombre": "valores raros",
+      "args": [
+        {
+          "gameVersions": [
+            "a b",
+            "~*",
+            "ñ"
+          ]
+        }
+      ],
+      "salida_json": "\"game_versions=%5B%22a+b%22%2C%22%7E*%22%2C%22%C3%B1%22%5D\"",
+      "error": null
+    }
+  ],
+  "modrinth_version_from": [
+    {
+      "nombre": "lista de una",
+      "args": [
+        [
+          {
+            "id": "v1",
+            "version_number": "1.0",
+            "game_versions": [
+              "1.20.1"
+            ],
+            "loaders": [
+              "paper"
+            ],
+            "files": [
+              {
+                "url": "https://cdn/a.jar",
+                "filename": "a.jar",
+                "hashes": {
+                  "sha512": "aaa"
+                },
+                "primary": true
+              }
+            ]
+          }
+        ],
+        "sodium"
+      ],
+      "salida_json": "{\"id\":\"v1\",\"version_number\":\"1.0\",\"game_versions\":[\"1.20.1\"],\"loaders\":[\"paper\"],\"files\":[{\"url\":\"https://cdn/a.jar\",\"filename\":\"a.jar\",\"hashes\":{\"sha512\":\"aaa\"},\"primary\":true}]}",
+      "error": null
+    },
+    {
+      "nombre": "lista vacía",
+      "args": [
+        [],
+        "sodium"
+      ],
+      "salida_json": null,
+      "error": "Modrinth: sin versión de sodium para esos filtros"
+    },
+    {
+      "nombre": "no es lista",
+      "args": [
+        {
+          "version": 1
+        },
+        "sodium"
+      ],
+      "salida_json": null,
+      "error": "Modrinth: sin versión de sodium para esos filtros"
+    },
+    {
+      "nombre": "varias",
+      "args": [
+        [
+          {
+            "id": "v1",
+            "version_number": "1.0",
+            "game_versions": [
+              "1.20.1"
+            ],
+            "loaders": [
+              "paper"
+            ],
+            "files": [
+              {
+                "url": "https://cdn/1.jar",
+                "filename": "1.jar"
+              }
+            ]
+          },
+          {
+            "id": "v2",
+            "version_number": "1.0",
+            "game_versions": [
+              "1.20.1"
+            ],
+            "loaders": [
+              "paper"
+            ],
+            "files": [
+              {
+                "url": "https://cdn/2.jar",
+                "filename": "2.jar"
+              }
+            ]
+          }
+        ],
+        "sodium"
+      ],
+      "salida_json": "{\"id\":\"v1\",\"version_number\":\"1.0\",\"game_versions\":[\"1.20.1\"],\"loaders\":[\"paper\"],\"files\":[{\"url\":\"https://cdn/1.jar\",\"filename\":\"1.jar\"}]}",
+      "error": null
+    }
+  ],
+  "primary_file": [
+    {
+      "nombre": "con primario",
+      "args": [
+        {
+          "id": "v1",
+          "version_number": "1.0",
+          "game_versions": [
+            "1.20.1"
+          ],
+          "loaders": [
+            "paper"
+          ],
+          "files": [
+            {
+              "url": "https://cdn/a.jar",
+              "filename": "a.jar",
+              "hashes": {
+                "sha512": "aaa"
+              },
+              "primary": false
+            },
+            {
+              "url": "https://cdn/b.jar",
+              "filename": "b.jar",
+              "hashes": {
+                "sha512": "bbb"
+              },
+              "primary": true
+            }
+          ]
+        }
+      ],
+      "salida_json": "{\"url\":\"https://cdn/b.jar\",\"filename\":\"b.jar\",\"hashes\":{\"sha512\":\"bbb\"},\"primary\":true}",
+      "error": null
+    },
+    {
+      "nombre": "sin primario",
+      "args": [
+        {
+          "id": "v1",
+          "version_number": "1.0",
+          "game_versions": [
+            "1.20.1"
+          ],
+          "loaders": [
+            "paper"
+          ],
+          "files": [
+            {
+              "url": "https://cdn/a.jar",
+              "filename": "a.jar"
+            },
+            {
+              "url": "https://cdn/b.jar",
+              "filename": "b.jar"
+            }
+          ]
+        }
+      ],
+      "salida_json": "{\"url\":\"https://cdn/a.jar\",\"filename\":\"a.jar\"}",
+      "error": null
+    },
+    {
+      "nombre": "sin ficheros",
+      "args": [
+        {
+          "id": "v1",
+          "version_number": "1.0",
+          "game_versions": [
+            "1.20.1"
+          ],
+          "loaders": [
+            "paper"
+          ],
+          "files": []
+        }
+      ],
+      "salida_json": "null",
+      "error": null
+    }
+  ],
+  "modrinth_modpack_slug": [
+    {
+      "entrada": "https://modrinth.com/modpack/fabulously-optimized",
+      "salida": "fabulously-optimized"
+    },
+    {
+      "entrada": "https://modrinth.com/project/sodium",
+      "salida": "sodium"
+    },
+    {
+      "entrada": "https://modrinth.com/modpack/a",
+      "salida": "a"
+    },
+    {
+      "entrada": "https://modrinth.com/mod/blabla",
+      "salida": "https://modrinth.com/mod/blabla"
+    },
+    {
+      "entrada": "sodium",
+      "salida": "sodium"
+    },
+    {
+      "entrada": "",
+      "salida": ""
+    },
+    {
+      "entrada": "https://modrinth.com/modpack/ñandú",
+      "salida": "https://modrinth.com/modpack/ñandú"
+    }
+  ]
+}

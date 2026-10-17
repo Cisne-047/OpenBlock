@@ -26,13 +26,27 @@ export async function latestVersion(
   slug: string,
   opts: { gameVersions?: string[]; loaders?: string[] } = {}
 ): Promise<ModrinthVersion> {
+  const list = (await httpJson(
+    `${MR}/project/${encodeURIComponent(slug)}/version?${modrinthVersionParams(opts)}`
+  )) as ModrinthVersion[];
+  return modrinthVersionFrom(list, slug);
+}
+
+/**
+ * la query de `latestVersion`. Ojo: `URLSearchParams` **no** escapa como
+ * `encodeURIComponent` —deja pasar `*`, `~`, `-`, `.`, `_` y escribe el espacio
+ * como `+`—, y el valor va con `JSON.stringify`, corchetes y comillas incluidos.
+ */
+export function modrinthVersionParams(opts: { gameVersions?: string[]; loaders?: string[] } = {}): string {
   const params = new URLSearchParams();
   if (opts.gameVersions?.length)
     params.set("game_versions", JSON.stringify(opts.gameVersions));
   if (opts.loaders?.length) params.set("loaders", JSON.stringify(opts.loaders));
-  const list = (await httpJson(
-    `${MR}/project/${encodeURIComponent(slug)}/version?${params}`
-  )) as ModrinthVersion[];
+  return params.toString();
+}
+
+/** la primera versión de la lista; sin lista o vacía, lanza */
+export function modrinthVersionFrom(list: ModrinthVersion[], slug: string): ModrinthVersion {
   if (!Array.isArray(list) || list.length === 0)
     throw new Error(`Modrinth: sin versión de ${slug} para esos filtros`);
   return list[0];
@@ -73,10 +87,14 @@ export function mrpackServerFiles(idx: MrpackIndex): MrpackEntry[] {
 
 /** URL del .mrpack a partir de una URL de página de Modrinth (o directo .mrpack) */
 export async function modrinthModpackFile(url: string): Promise<{ file: ModrinthFile; version: ModrinthVersion }> {
-  const m = /modrinth\.com\/(?:modpack|project)\/([\w-]+)/.exec(url);
-  const slug = m ? m[1] : url;
-  const version = await latestVersion(slug, {});
+  const version = await latestVersion(modrinthModpackSlug(url), {});
   return { file: primaryFile(version), version };
+}
+
+/** el slug de una URL de Modrinth, o la propia URL si no lo parece */
+export function modrinthModpackSlug(url: string): string {
+  const m = /modrinth\.com\/(?:modpack|project)\/([\w-]+)/.exec(url);
+  return m ? m[1] : url;
 }
 
 // --- CurseForge (manifest del zip exportado del launcher) ---

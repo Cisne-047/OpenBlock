@@ -41,7 +41,8 @@ vigila al otro lado. `forge-api` es el único que hace red, igual que en el TS s
 | `api::mojang` | portado (red + parte pura con fixture) |
 | `modrinth` (parsers de modpack) | portado |
 | `api::engines` | portado (con `url` y `js` de apoyo) |
-| cliente de Modrinth (red) | pendiente, los parsers ya están |
+| cliente de Modrinth | portado: query, primera versión y fichero primario |
+| `.mrpack` (zip) | pendiente: hace falta leer el zip, no solo el índice |
 | `plan` (resolver el manifiesto) | pendiente |
 | `doctor` (aritmética: score, nota, dedupe) | portado |
 | `doctor` (reglas, boot, arreglos) | pendiente |
@@ -85,6 +86,10 @@ Lo que la paridad ha cazado, y que ninguna lectura del código habría visto:
 - **Los acrónimos de serde**: `ram_mb` sale `ramMb` y el JSON dice `ramMB`;
   `target_os` sale `targetOs` y dice `targetOS`; `disk_m_bs` sale `diskMbS` y dice
   `diskMBs`. Tres `rename` explícitos. Sin esto, `openblock.json` no reimporta.
+- **`URLSearchParams` escapa `~` y `encodeURIComponent` no.** Escribí el
+  codificador de la query de Modrinth con el conjunto «seguro» de memoria y el
+  caso de `~` lo cantó: `a b~*` sale `a+b%7E*`, no `a+b~*`. Dos codificadores
+  distintos en el mismo fichero del TS, y ninguno es el que uno recuerda.
 - **El regex de `parseMc`**, tres veces. Mis tres lecturas eran falsas.
 - **Dos líneas en blanco de diferencia** en `install.sh` e `install.ps1`. No era
   lógica: cuando **no** hay installer, la línea de apertura del ternario del
@@ -170,7 +175,7 @@ Deliberadas y anotadas, como la lista que DistroForge mantiene en su
 | fichero TS | líneas | a dónde va | por qué |
 |---|---|---|---|
 | `src/plan.ts` | 215 | `forge-api` (resolver) + núcleo (modelo, ya portado) | convierte config en manifiesto de descargas; con esto `forge generate` funciona de verdad |
-| `src/api/modrinth.ts` | — | `forge-api` | los parsers están; falta la descarga de `.mrpack` |
+| `src/api/modrinth.ts` | 126 | `forge-api` (la query y la elección) | falta la descarga del `.mrpack` y descomprimir el zip |
 | `src/doctor.ts` | 629 | `forge-cli` (la aritmética ya está en el núcleo) | 16 reglas, boot test y fixes; necesita red, disco y RCON |
 | `src/apply.ts`, `java.ts` | 360 | `forge-cli` | escritura, descargas, JDK |
 | `src/advanced.ts`, `guided.ts`, `index.ts` | 729 | `forge-cli` | la CLI completa |
