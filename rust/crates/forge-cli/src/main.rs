@@ -4,14 +4,10 @@
 //! todo lo que sí lo toca: la detección de hardware y la escritura a disco. Es el
 //! mismo reparto que el TS hace con `output.ts`.
 //!
-//! Subcomandos:
-//!
-//! - `forge detect [--json]` — hardware detectado, con el mismo JSON que el TS.
-//! - `forge plan <config.json> [plan.json]` — resuelve el manifiesto contra las APIs.
-//! - `forge dump <config.json> <plan.json> <dir> [cores]` — proyecto a disco.
-//! - `forge doctor [--dir D] [--json]` — diagnostica un server instalado.
-//!
-//! En construcción: la pregeneración de install y el modo guiado.
+//! Subcomandos: el texto que ve el usuario es `HELP`, aquí abajo. El despacho vive
+//! en `main`, y su superficie —los alias `advanced` y `smoke`, el `--help` de
+//! `install`, lo que pasa cuando no hay subcomando— la fija `tests/dispatch.rs`
+//! ejecutando el binario de verdad.
 
 mod advanced;
 mod apply;
@@ -57,6 +53,8 @@ forge — forja servidores de Minecraft según tu hardware (Windows/Linux)
   forge rcon <host> <puerto> <cmd>
                                   Manda un comando por RCON
                                   (pass: OPENBLOCK_RCON_PASSWORD)
+  forge guided                    Asistente paso a paso: pregunta y instala
+  forge --version                 La versión
   forge help                      Esta ayuda
 
 Flags de config (generate/install), con la precedencia flag > --config > hardware:
@@ -70,8 +68,13 @@ Flags de config (generate/install), con la precedencia flag > --config > hardwar
   --installer-build N (fabric/quilt), --custom url1,ruta2 (plugins/mods propios)
   --cores N (hilos para los scripts)
 
-Falta respecto al CLI de TypeScript: el modo guiado (`guided`) y `advanced`
-—aquí las flags del modo avanzado se dan a `generate` y a `install`—.
+Respecto al CLI de TypeScript: `advanced` y `smoke` son alias de `install` y de
+`self-test`, y las flags del modo avanzado valen igual para `generate` y para
+`install`. Sin subcomando no se instala nada: `forge` a secas imprime esta ayuda,
+y `forge --engine paper` dice que eso es una flag y no un comando, en vez de
+instalar por un flag mal escrito. El TS preguntaba «¿Aplicamos?»; aquí no hay
+preguntas —`--yes` se acepta por compatibilidad—, que es lo que permite usarlo
+desde un script.
 
 Project format: openblock.json round-trip, como DistroForge.
 "#;
@@ -100,6 +103,9 @@ fn uso() -> ExitCode {
     eprintln!("  doctor [--dir D] [--json]       diagnostica un server instalado (solo lectura)");
     eprintln!("  latest                          última release de Minecraft (consulta Mojang)");
     eprintln!("  rcon <host> <puerto> <comando>  manda un comando por RCON (pass: OPENBLOCK_RCON_PASSWORD)");
+    eprintln!("  guided                          asistente paso a paso (pregunta y instala)");
+    eprintln!("  help | --help | -h              la ayuda larga, con todas las flags");
+    eprintln!("  --version | -V                  la versión");
     ExitCode::from(2)
 }
 
@@ -108,7 +114,9 @@ fn main() -> ExitCode {
     match args.first().map(String::as_str) {
         Some("detect") => detect_cmd(&args[1..]),
         Some("dump") => dump_cmd(&args[1..]),
-        Some("install") => install_cmd(&args[1..]),
+        // `advanced` es el nombre que le da el TS (`openblock advanced <flags>`);
+        // aquí es alias de `install`, que es lo mismo con otro nombre.
+        Some("install") | Some("advanced") => install_cmd(&args[1..]),
         Some("generate") => generate_cmd(&args[1..]),
         Some("bench") => bench_cmd(),
         Some("info") => info_cmd(&args[1..]),
@@ -119,17 +127,38 @@ fn main() -> ExitCode {
                 ExitCode::FAILURE
             }
         },
+        Some("--version") | Some("-V") => {
+            println!("forge {}", forge_core::VERSION);
+            ExitCode::SUCCESS
+        }
         Some("help") | Some("--help") | Some("-h") => {
             println!("{HELP}");
             ExitCode::SUCCESS
         }
         Some("backup") => backup_cmd(&args[1..]),
         Some("stop") => stop_cmd(&args[1..]),
-        Some("self-test") => self_test_cmd(&args[1..]),
+        // `smoke` era el alias del TS (y el nombre del job de CI que lo ejecuta).
+        Some("self-test") | Some("smoke") => self_test_cmd(&args[1..]),
         Some("latest") => latest_cmd(),
         Some("doctor") => doctor_cmd(&args[1..]),
         Some("plan") => plan_cmd(&args[1..]),
         Some("rcon") => rcon_cmd(&args[1..]),
+        // El TS, sin subcomando, se iba al modo avanzado con todo `argv`
+        // (`openblock --engine paper --yes` instalaba). Aquí no: instalar por un flag
+        // mal escrito y sin preguntar es un regalo envenenado, así que se dice cómo se
+        // escribe. `--help` en cualquier posición sí se atiende, que para eso está.
+        Some(flag) if flag.starts_with('-') => {
+            if args.iter().any(|a| a == "--help" || a == "-h") {
+                println!("{HELP}");
+                return ExitCode::SUCCESS;
+            }
+            eprintln!("uso: forge <comando> [opciones]");
+            eprintln!();
+            eprintln!("«{flag}» es una flag, no un comando. Las del modo avanzado van con");
+            eprintln!("subcomando: `forge install {flag} …` o `forge generate {flag} …`.");
+            eprintln!("`forge help` lista los comandos.");
+            ExitCode::from(2)
+        }
         _ => uso(),
     }
 }
@@ -357,7 +386,8 @@ fn doctor_cmd(args: &[String]) -> ExitCode {
     }
 }
 
-/// `forge install <config.json> [--force] [--dry-run]`.
+/// `forge install <config.json> [--force] [--dry-run]`, y `forge advanced` es el
+/// mismo comando: el TS le daba los dos nombres a la misma rama.
 ///
 /// Es el camino completo: resolver el plan, escribir el proyecto, dejar el Java en
 /// `runtime/`, bajar el engine, los plugins y los mods, y ejecutar el installer de
@@ -372,6 +402,12 @@ fn install_cmd(args: &[String]) -> ExitCode {
             return ExitCode::from(2);
         }
     };
+    // `--help` gana a todo: el TS lo mira antes de tocar nada (`advanced`), y sin esto
+    // `forge install --help` se ponía a instalar con los defaults del hardware.
+    if a.help {
+        println!("{HELP}");
+        return ExitCode::SUCCESS;
+    }
     let mut cfg = match advanced::construir_config(&a) {
         Ok(c) => c,
         Err(e) => {

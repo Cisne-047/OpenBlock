@@ -1,6 +1,6 @@
 [package]
 name = "forge-cli"
-description = "CLI de OpenBlock en Rust (en construcción)."
+description = "CLI de OpenBlock en Rust."
 version.workspace = true
 edition.workspace = true
 license.workspace = true
