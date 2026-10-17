@@ -4,15 +4,16 @@
 //! Deja `start.sh`/`start.bat` listos, Java encapsulado en `runtime/`, los
 //! plugins/mods descargados y (si toca) el installer de Forge/NeoForge ejecutado.
 //!
-//! Lo que **no** está portado todavía: la pregeneración por RCON (`pregenerate`),
-//! `stopServer`, `runBackup` y `extractCfOverrides`. Los tres primeros son de los
-//! subcomandos `pregen`/`stop`/`backup` del modo avanzado, que tampoco están.
+//! Lo que falta no es esto: es la superficie de comandos del modo avanzado que
+//! llama a `pregenerate`, `stopServer` y `runBackup`.
 
 use forge_api::plan::build_download_plan;
 use forge_core::generators::{generate_project, validate};
 use forge_core::plan::DownloadPlan;
-use forge_core::types::ServerConfig;
+use forge_core::types::{EngineId, ServerConfig};
 use std::path::Path;
+use std::process::{Command, Stdio};
+use std::time::{Duration, Instant};
 
 /// El `FileMap` que produce el núcleo: ruta relativa → contenido.
 type FileMap = std::collections::BTreeMap<String, String>;
@@ -282,6 +283,178 @@ fn run_java(
     } else {
         Err(format!(
             "Installer salió con código {}",
+            estado.code().unwrap_or(-1)
+        ))
+    }
+}
+
+// ---------- pregeneración y compañía ----------
+
+/// Los últimos `n` caracteres de un texto (el `slice(-4000)` del TS).
+///
+/// Por caracteres y no por bytes porque cortar por byte en medio de uno multibyte
+/// revienta en Rust, y un log de Minecraft tiene acentos y emojis.
+fn ultimos_chars(txt: &str, n: usize) -> &str {
+    match txt.char_indices().rev().nth(n.saturating_sub(1)) {
+        Some((i, _)) => &txt[i..],
+        None => txt,
+    }
+}
+
+/// Arranca el server en segundo plano, espera a `Done` y lanza Chunky por RCON
+/// (`pregenerate`).
+///
+/// El proceso se lanza **desacoplado**: no se espera a que termine ni se mata al
+/// salir. La pregeneración sigue corriendo cuando este comando ya ha vuelto, que
+/// es justo lo que se quiere.
+pub fn pregenerate(
+    cfg: &ServerConfig,
+    dir: &Path,
+    java_path: &str,
+    plan: &DownloadPlan,
+    log: &mut dyn FnMut(String),
+) -> Result<(), String> {
+    if !cfg.rcon.enabled {
+        return Err("Pregeneración requiere RCON (cfg.rcon.enabled)".to_string());
+    }
+    let log_path = dir.join("logs").join("latest.log");
+
+    log("== Pregeneración: arrancando server en background ==".to_string());
+    let jvm_args: Vec<String> = std::fs::read_to_string(dir.join("jvm-args.txt"))
+        .map(|t| t.split_whitespace().map(str::to_string).collect())
+        .unwrap_or_default();
+
+    if plan.installer.is_some() {
+        // forge/neoforge arrancan con su propio launcher
+        let runner = if cfg!(windows) { "run.bat" } else { "run.sh" };
+        if !dir.join(runner).exists() {
+            return Err("Installer pendiente: no hay run.sh/run.bat".to_string());
+        }
+        let mut c = Command::new(if cfg!(windows) { "cmd.exe" } else { "bash" });
+        if cfg!(windows) {
+            c.arg("/c");
+        }
+        c.arg(runner).arg("nogui");
+        lanzar_desacoplado(&mut c, dir)?;
+    } else {
+        let gui = if cfg.engine == EngineId::Vanilla {
+            "nogui"
+        } else {
+            "--nogui"
+        };
+        let mut c = Command::new(java_path);
+        c.args(&jvm_args)
+            .arg("-jar")
+            .arg(&plan.engine_filename)
+            .arg(gui);
+        lanzar_desacoplado(&mut c, dir)?;
+    }
+
+    log("Esperando arranque (mira logs/latest.log)...".to_string());
+    let deadline = Instant::now() + Duration::from_secs(20 * 60);
+    // los dos patrones se compilan una vez, fuera del bucle: dentro se recompilarían
+    // cada 3 segundos durante 20 minutos, y clippy lo canta con razón
+    let done = regex::Regex::new(r"Done \([0-9.]+s\)!").expect("patrón constante");
+    let fallo =
+        regex::Regex::new(r#"Failed to start the minecraft server|Exception in thread "main""#)
+            .expect("patrón constante");
+    loop {
+        if Instant::now() > deadline {
+            return Err("Timeout esperando 'Done' del server".to_string());
+        }
+        std::thread::sleep(Duration::from_secs(3));
+        if let Ok(txt) = std::fs::read_to_string(&log_path) {
+            let cola = ultimos_chars(&txt, 4000);
+            if done.is_match(cola) {
+                break;
+            }
+            if fallo.is_match(cola) {
+                return Err("El server crasheó al arrancar; revisa logs/latest.log".to_string());
+            }
+        }
+    }
+    log("✓ Server arriba.".to_string());
+
+    let radio = cfg.pregen_radius;
+    crate::rcon::with_rcon("127.0.0.1", cfg.rcon.port, &cfg.rcon.password, |r| {
+        log(format!("chunky radius {radio}"));
+        match r.command(&format!("chunky radius {radio}")) {
+            Ok(resp) => log(format!("  {}", resp.trim())),
+            Err(e) => log(format!("  {e}")),
+        }
+        log("chunky start".to_string());
+        match r.command("chunky start") {
+            Ok(resp) => log(format!("  {}", resp.trim())),
+            Err(e) => log(format!("  {e}")),
+        }
+        // spark puede no estar
+        if let Ok(tps) = r.command("spark tps") {
+            log(format!("  TPS: {}", tps.trim()));
+        }
+        Ok(())
+    })
+    .map_err(|e| e.to_string())?;
+
+    log(format!(
+        "✓ Pregeneración lanzada ({radio} de radio). Sigue el progreso en la consola del server."
+    ));
+    Ok(())
+}
+
+/// Lanza un proceso sin esperarlo y sin capturar sus salidas.
+///
+/// `detached` + `unref` del TS: el hijo sobrevive a este proceso, que es lo que
+/// hace que la pregeneración siga cuando el comando ya volvió.
+fn lanzar_desacoplado(cmd: &mut Command, dir: &Path) -> Result<(), String> {
+    cmd.current_dir(dir)
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .spawn()
+        .map(|_| ())
+        .map_err(|e| format!("no se pudo arrancar el server: {e}"))
+}
+
+/// Apagado limpio por RCON (`stopServer`).
+pub fn stop_server(cfg: &ServerConfig) -> Result<(), String> {
+    crate::rcon::with_rcon("127.0.0.1", cfg.rcon.port, &cfg.rcon.password, |r| {
+        r.command("stop")
+    })
+    .map(|_| ())
+    .map_err(|e| e.to_string())
+}
+
+/// Ejecuta el script de backup del server (`runBackup`).
+///
+/// Hereda la salida del script (`stdio: "inherit"`): el backup imprime su progreso
+/// y el usuario lo ve en directo.
+pub fn run_backup(dir: &str) -> Result<(), String> {
+    let script = if cfg!(windows) {
+        "backup.ps1"
+    } else {
+        "backup.sh"
+    };
+    let path = crate::resolver(dir).join(script);
+    if !path.exists() {
+        return Err(format!(
+            "No existe {}: instala el server primero",
+            path.display()
+        ));
+    }
+    let mut c = Command::new(if cfg!(windows) {
+        "powershell.exe"
+    } else {
+        "bash"
+    });
+    if cfg!(windows) {
+        c.args(["-NoProfile", "-File"]);
+    }
+    let estado = c.arg(&path).status().map_err(|e| e.to_string())?;
+    if estado.success() {
+        Ok(())
+    } else {
+        Err(format!(
+            "Backup salió con código {}",
             estado.code().unwrap_or(-1)
         ))
     }

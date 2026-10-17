@@ -32,6 +32,10 @@ fn uso() -> ExitCode {
     );
     eprintln!("  dump <config> <plan> <dir> [n]  genera el proyecto desde config y plan");
     eprintln!("  install <config> [--force]      resuelve el plan y baja todo: server instalado");
+    eprintln!("  backup <dir>                    ejecuta el script de backup del server");
+    eprintln!(
+        "  stop <dir>                      apaga el server por RCON (tiene que estar arriba)"
+    );
     eprintln!("  doctor [--dir D] [--json]       diagnostica un server instalado (solo lectura)");
     eprintln!("  latest                          última release de Minecraft (consulta Mojang)");
     eprintln!("  rcon <host> <puerto> <comando>  manda un comando por RCON (pass: OPENBLOCK_RCON_PASSWORD)");
@@ -44,6 +48,8 @@ fn main() -> ExitCode {
         Some("detect") => detect_cmd(&args[1..]),
         Some("dump") => dump_cmd(&args[1..]),
         Some("install") => install_cmd(&args[1..]),
+        Some("backup") => backup_cmd(&args[1..]),
+        Some("stop") => stop_cmd(&args[1..]),
         Some("latest") => latest_cmd(),
         Some("doctor") => doctor_cmd(&args[1..]),
         Some("plan") => plan_cmd(&args[1..]),
@@ -279,8 +285,9 @@ fn doctor_cmd(args: &[String]) -> ExitCode {
 ///
 /// Es el camino completo: resolver el plan, escribir el proyecto, dejar el Java en
 /// `runtime/`, bajar el engine, los plugins y los mods, y ejecutar el installer de
-/// Forge/NeoForge si toca. Lo que falta respecto al TS es la pregeneración, que
-/// arranca el server y lanza Chunky por RCON.
+/// Forge/NeoForge si toca, y con --pregen arranca el server y lanza Chunky por
+/// RCON. La pregeneración va apagada por defecto —en el TS es al revés, con
+/// --no-pregen— porque son 20 minutos de espera máxima en un install.
 fn install_cmd(args: &[String]) -> ExitCode {
     if args.is_empty() {
         eprintln!("uso: forge install <config.json> [--force] [--dry-run]");
@@ -304,11 +311,15 @@ fn install_cmd(args: &[String]) -> ExitCode {
         cores: num_cpus(),
         ..Default::default()
     };
+    // la pregeneracion NO va por defecto: arranca un server y espera a Done (hasta
+    // 20 minutos). En el TS es al reves, con --no-pregen para quitarla.
+    let mut pregen = false;
     let mut i = 1;
     while i < args.len() {
         match args[i].as_str() {
             "--force" => opts.force = true,
             "--dry-run" => opts.dry_run = true,
+            "--pregen" => pregen = true,
             "--dir" => {
                 i += 1;
                 match args.get(i) {
@@ -343,10 +354,83 @@ fn install_cmd(args: &[String]) -> ExitCode {
         cfg.rcon.password = doctor::password_aleatorio();
     }
 
-    match apply::apply_config(&mut cfg, &opts, &mut |l| println!("{l}")) {
+    if let Err(e) = apply::apply_config(&mut cfg, &opts, &mut |l| println!("{l}")) {
+        eprintln!("{e}");
+        return ExitCode::FAILURE;
+    }
+
+    // 4) pregeneracion opcional via RCON + Chunky
+    if pregen && cfg.pregen_radius > 0 {
+        let dir = resolver(&cfg.server_dir);
+        let (plan, _) = match forge_api::plan::build_download_plan(&cfg) {
+            Ok(p) => p,
+            Err(e) => {
+                eprintln!("No se pudo resolver el plan para la pregeneracion: {e}");
+                return ExitCode::FAILURE;
+            }
+        };
+        let java_path = std::fs::read_to_string(dir.join("runtime").join("java.path"))
+            .map(|t| t.trim().to_string())
+            .unwrap_or_else(|_| "java".to_string());
+        if let Err(e) = apply::pregenerate(&cfg, &dir, &java_path, &plan, &mut |l| println!("{l}"))
+        {
+            eprintln!("{e}");
+            return ExitCode::FAILURE;
+        }
+    }
+    ExitCode::SUCCESS
+}
+
+/// `forge backup <dir>` — ejecuta el script de backup del server.
+fn backup_cmd(args: &[String]) -> ExitCode {
+    let Some(dir) = args.first() else {
+        eprintln!("uso: forge backup <dir>");
+        return ExitCode::from(2);
+    };
+    match apply::run_backup(dir) {
         Ok(()) => ExitCode::SUCCESS,
         Err(e) => {
             eprintln!("{e}");
+            ExitCode::FAILURE
+        }
+    }
+}
+
+/// `forge stop <dir>` — apaga el server por RCON.
+///
+/// El `serverDir` que trae el `openblock.json` puede ser de otra máquina, así que
+/// si no existe se usa el directorio del propio fichero, como en el doctor.
+fn stop_cmd(args: &[String]) -> ExitCode {
+    let Some(dir) = args.first() else {
+        eprintln!("uso: forge stop <dir>");
+        return ExitCode::from(2);
+    };
+    let raiz = resolver(dir);
+    let cfg_path = raiz.join("openblock.json");
+    let cfg_txt = match fs::read_to_string(&cfg_path) {
+        Ok(t) => t,
+        Err(_) => {
+            eprintln!("No existe {}", cfg_path.display());
+            return ExitCode::FAILURE;
+        }
+    };
+    let mut cfg: forge_core::ServerConfig = match serde_json::from_str(&cfg_txt) {
+        Ok(c) => c,
+        Err(e) => {
+            eprintln!("openblock.json inválido: {e}");
+            return ExitCode::FAILURE;
+        }
+    };
+    if !Path::new(&cfg.server_dir).exists() {
+        cfg.server_dir = raiz.to_string_lossy().to_string();
+    }
+    match apply::stop_server(&cfg) {
+        Ok(()) => {
+            println!("stop enviado a 127.0.0.1:{}", cfg.rcon.port);
+            ExitCode::SUCCESS
+        }
+        Err(e) => {
+            eprintln!("No se pudo apagar el server: {e}");
             ExitCode::FAILURE
         }
     }

@@ -53,8 +53,8 @@ vigila al otro lado. `forge-api` es el único que hace red, igual que en el TS s
 | `net::downloadTo` (descarga con hash y reintento) | portado, con servidor falso en los tests |
 | `java::ensureJava` (JDK del sistema o Temurin) | portado; ver la nota de abajo |
 | `apply` (`install`: proyecto + java + descargas + installer) | portado y comparado con el TS |
-| `apply` (`pregenerate`, `stopServer`, `runBackup`, `extractCfOverrides`) | pendiente |
-| CLI | `detect`, `plan`, `dump`, `install`, `doctor`, `latest` y `rcon` funcionan |
+| `apply` (`pregenerate`, `stopServer`, `runBackup`) | portado y probado con un server de verdad |
+| CLI | `detect`, `plan`, `dump`, `install`, `doctor`, `backup`, `stop`, `latest` y `rcon` |
 
 **El núcleo generador está completo y con paridad byte a byte**: los 23 ficheros
 del proyecto salen idénticos al TypeScript, `openblock.json` incluido. Los tiers
@@ -195,6 +195,36 @@ comparando la detección — eso tiene su propio test.
 
 La pregeneración va apagada en la comparación: arranca el server y lanza Chunky por
 RCON durante 20 minutos.
+
+### La pregeneración, arrancando un server de verdad
+
+`forge install --pregen` sobre un Paper 1.20.4 recién instalado, de punta a punta:
+
+```
+== Pregeneración: arrancando server en background ==
+Esperando arranque (mira logs/latest.log)...
+✓ Server arriba.
+chunky radius 4000
+  [Chunky] Radius changed to 4000.
+chunky start
+  [Chunky] Task started in world for the square region centered at 0, 0 with radius 4000.
+  TPS: Unknown command. Type "/help" for help.
+```
+
+Chunky se puso a generar chunks de verdad (ETA 28 minutos, 110 chunks/s), y el
+`spark tps` respondió «Unknown command» porque spark no tiene build para 1.20.4 —que
+es justo el caso que el TS se traga con un `try/catch`, y que aquí se imprime sin
+fallar—. Después, `forge stop` mandó el `stop` por RCON y el server se apagó solo:
+«All dimensions are saved», «Closing Server», y cero procesos `java` vivos.
+
+`forge backup` lanza el `backup.ps1` que genera OpenBlock y hereda su salida. En la
+máquina donde se probó, Windows tiene la ejecución de scripts deshabilitada, así que
+el script no corre y el comando sale con «Backup salió con código 1» — exactamente lo
+que diría el TS, que tampoco fuerza `-ExecutionPolicy`. Lo que queda probado es el
+camino de error, no el backup en sí.
+
+Y `extractCfOverrides` **no** se portó: el TS la exporta y no la llama nadie, igual
+que `javaBinDir`.
 
 Lo que la paridad ha cazado, y que ninguna lectura del código habría visto:
 
