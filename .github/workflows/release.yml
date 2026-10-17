@@ -1,0 +1,83 @@
+name: release
+
+# Se dispara con un tag `v*`: compila el binario para cada plataforma soportada y
+# lo deja en un Release de GitHub. Es la forma de instalar `forge` sin tener Rust
+# (ver install.sh / install.ps1), y sustituye al paquete de npm, que quedó congelado
+# en la v0.1.0 del TypeScript.
+#
+# Solo dos plataformas, las mismas que soportaba el TypeScript (`os: [win32, linux]`),
+# y x64 en las dos: compilar aarch64 desde un runner x64 pide enlazador cruzado y
+# aquí no se está usando. El día que haga falta se añade al matrix.
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: build (${{ matrix.target }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      # si una plataforma falla, que se vea, en vez de publicar un Release cojo
+      fail-fast: true
+      matrix:
+        include:
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            bin: forge.exe
+            asset: forge-x86_64-pc-windows-msvc.exe
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            bin: forge
+            asset: forge-x86_64-unknown-linux-gnu
+    steps:
+      - uses: actions/checkout@v4
+      - name: Toolchain de Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: rust
+      - name: Compila en release
+        run: cargo build --release --manifest-path rust/Cargo.toml --target ${{ matrix.target }}
+      - name: El binario arranca
+        shell: bash
+        run: rust/target/${{ matrix.target }}/release/${{ matrix.bin }} --help
+      - name: Prepara el asset
+        shell: bash
+        run: cp "rust/target/${{ matrix.target }}/release/${{ matrix.bin }}" "${{ matrix.asset }}"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.asset }}
+          path: ${{ matrix.asset }}
+          if-no-files-found: error
+
+  release:
+    name: Release de GitHub
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: assets
+          merge-multiple: true
+      - name: Comprueba que están los dos binarios
+        run: |
+          ls -l assets
+          for f in forge-x86_64-pc-windows-msvc.exe forge-x86_64-unknown-linux-gnu; do
+            test -s "assets/$f" || { echo "falta $f"; exit 1; }
+          done
+      - name: Publica el Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "${GITHUB_REF_NAME}" \
+            --repo "${GITHUB_REPOSITORY}" \
+            --title "OpenBlock ${GITHUB_REF_NAME} (Rust)" \
+            --generate-notes \
+            assets/forge-x86_64-pc-windows-msvc.exe \
+            assets/forge-x86_64-unknown-linux-gnu

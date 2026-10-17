@@ -18,7 +18,7 @@ if (Need-Java) {
   Write-Host "== Bajando Temurin JDK $JavaMajor (runtime encapsulado) =="
   $arch = if ($env:PROCESSOR_ARCHITECTURE -eq "ARM64") { "aarch64" } else { "x64" }
   $zip = "temurin$JavaMajor.zip"
-  Invoke-WebRequest -Uri "https://api.adoptium.net/v3/binary/latest/$JavaMajor/ga/windows/$arch/jdk/hotspot/normal/eclipse" -OutFile $zip -UserAgent "OpenBlock/0.1.0 (+https://github.com/cisne-047)"
+  Invoke-WebRequest -Uri "https://api.adoptium.net/v3/binary/latest/$JavaMajor/ga/windows/$arch/jdk/hotspot/normal/eclipse" -OutFile $zip -UserAgent "OpenBlock/0.2.0 (+https://github.com/cisne-047)"
   New-Item -ItemType Directory -Force -Path runtime | Out-Null
   Expand-Archive -Path $zip -DestinationPath runtime -Force
   $root = (Get-ChildItem runtime -Directory | Where-Object Name -like "jdk*" | Select-Object -First 1).FullName
@@ -38,7 +38,7 @@ foreach ($d in $downloads) {
   Write-Host "== Bajando $(Split-Path $d.dest -Leaf) =="
   $dir = Split-Path $d.dest -Parent
   if ($dir) { New-Item -ItemType Directory -Force -Path $dir | Out-Null }
-  Invoke-WebRequest -Uri $d.url -OutFile $d.dest -UserAgent "OpenBlock/0.1.0 (+https://github.com/cisne-047)"
+  Invoke-WebRequest -Uri $d.url -OutFile $d.dest -UserAgent "OpenBlock/0.2.0 (+https://github.com/cisne-047)"
   if ($d.sha) {
     # hashes de Modrinth son sha512 (128 chars); los de PaperMC, sha256
     $algo = if ($d.sha.Length -gt 64) { "SHA512" } else { "SHA256" }

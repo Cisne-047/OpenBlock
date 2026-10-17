@@ -1,6 +1,6 @@
 {
   "name": "openblock",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "type": "module",
   "description": "OpenBlock — forja servidores de Minecraft según tu hardware. Detección + tuning automático en Windows y Linux.",
   "license": "MIT",

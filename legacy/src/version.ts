@@ -13,7 +13,7 @@
  */
 
 /** Versión completa, tal cual en `package.json`. */
-export const VERSION = "0.1.0";
+export const VERSION = "0.2.0";
 
 /** Versión corta para pantallas: 0.1.0 → `0.1`; 0.1.2 → `0.1.2`. */
 export function shortVersion(version: string = VERSION): string {
