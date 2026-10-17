@@ -6,9 +6,19 @@
 *.timer text eol=lf
 *.service text eol=lf
 
-# En Windows se generan aparte con CRLF
-*.ps1 text eol=crlf
-*.bat text eol=crlf
+# El golden se compara byte a byte, así que no se convierte nunca: en un clon de
+# Windows tiene que bajar en LF, que es como lo escribe el generador del TS.
+rust/crates/forge-core/tests/golden/** text eol=lf
+rust/crates/forge-api/tests/golden/** text eol=lf
+
+# Los .ps1 y .bat del repo también son LF, golden incluido: los generadores emiten
+# LF y el CRLF del .bat lo pone la escritura a disco, no el fichero versionado. Con
+# `eol=crlf` aquí, un clon nuevo de Windows se bajaba el golden en CRLF y
+# `cargo test` fallaba comparando bytes, mientras el CI (Linux) seguía verde.
+# Comprobado a mano: con el golden en CRLF, el test dice paridad rota en
+# «install.ps1» (línea 1, byte 31).
+*.ps1 text eol=lf
+*.bat text eol=lf
 
 *.jar binary
 *.zip binary
