@@ -146,7 +146,6 @@ fn meminfo_mb(campo: &str) -> u64 {
         if let Some(resto) = linea.strip_prefix(campo) {
             let kb: u64 = resto
                 .trim_start_matches(':')
-                .trim()
                 .split_whitespace()
                 .next()
                 .and_then(|v| v.parse().ok())
@@ -325,7 +324,7 @@ fn disk_kind() -> DiskKind {
     let Some(out) = sh("lsblk", &["-dn", "-o", "NAME,ROTA"]) else {
         return DiskKind::Unknown;
     };
-    let primera = out.lines().next().unwrap_or("").trim();
+    let primera = out.lines().next().unwrap_or("");
     let mut partes = primera.split_whitespace();
     let nombre = partes.next().unwrap_or("");
     let rota = partes.next().unwrap_or("1");
@@ -474,7 +473,6 @@ fn meminfo_bytes(campo: &str) -> u64 {
         if let Some(resto) = linea.strip_prefix(campo) {
             let kb: u64 = resto
                 .trim_start_matches(':')
-                .trim()
                 .split_whitespace()
                 .next()
                 .and_then(|v| v.parse().ok())
