@@ -156,7 +156,6 @@ Deliberadas y anotadas, como la lista que DistroForge mantiene en su
 | `src/api/engines.ts` | 237 | `forge-api` | resuelve URLs de PaperMC/Fabric/Forge contra sus APIs |
 | `src/plan.ts` | 215 | `forge-api` (resolver) + núcleo (modelo, ya portado) | convierte config en manifiesto de descargas |
 | `src/doctor.ts` | 629 | `forge-cli` | 16 reglas, boot test, fixes y score; necesita red, disco y RCON |
-| `src/rcon.ts` (cliente) | ~60 | `forge-cli` | el códec ya está en el núcleo; falta el socket |
 | `src/apply.ts`, `java.ts` | 360 | `forge-cli` | escritura, descargas, JDK |
 | `src/advanced.ts`, `guided.ts`, `index.ts` | 729 | `forge-cli` | la CLI completa |
 
