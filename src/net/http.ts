@@ -2,8 +2,7 @@ import { createHash } from "node:crypto";
 import { createWriteStream } from "node:fs";
 import { pipeline } from "node:stream/promises";
 import { Readable } from "node:stream";
-
-const UA = "OpenBlock/0.1 (+https://github.com/cisne-047)";
+import { USER_AGENT as UA } from "../version";
 
 export async function httpJson(url: string, init?: RequestInit): Promise<unknown> {
   const res = await fetch(url, {

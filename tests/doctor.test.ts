@@ -3,44 +3,7 @@ import { mkdtemp, readFile, writeFile, rm, mkdir } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { findFreePort, jarNameFromStartScript, runDoctor } from "../src/doctor";
-import type { ServerConfig } from "../src/types";
-
-const cfg = (over: Partial<ServerConfig> = {}): ServerConfig => ({
-  name: "test",
-  mcVersion: "1.21.4",
-  engine: "paper",
-  serverDir: "/tmp/server",
-  ramMB: 8192,
-  players: 20,
-  viewDistance: 8,
-  simulationDistance: 6,
-  port: 25565,
-  motd: "test",
-  difficulty: "normal",
-  gamemode: "survival",
-  worldType: "normal",
-  seed: "",
-  onlineMode: true,
-  whitelist: false,
-  pvp: true,
-  hardcore: false,
-  modpack: { kind: "none", url: "" },
-  performance: "balanced",
-  pregenRadius: 0,
-  backup: { enabled: false, intervalHours: 24, keep: 7 },
-  service: { enabled: false },
-  rcon: { enabled: true, password: "secreto1234", port: 25575 },
-  chunkyborder: false,
-  targetOS: "both",
-  customItems: [],
-  ...over,
-});
-
-// acceso a las reglas para tests unitarios sin arrancar servers
-const ctxFor = (over: Partial<ServerConfig> = {}) => {
-  const c = cfg(over);
-  return { cfg: c, dir: c.serverDir, logLines: [] as string[], bootTested: false, bootOk: false };
-};
+import { ctxFor, doctorCfg as cfg } from "./helpers";
 
 describe("reglas de log", () => {
   it("detecta Java incorrecto y ofrece fix automático", async () => {

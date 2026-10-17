@@ -7,8 +7,6 @@ import { bukkitYml, paperGlobalYml, paperWorldDefaultsYml, spigotYml } from "./p
 import { installPs1, installSh, jvmArgsTxt, startBat, startSh, userJvmArgsTxt } from "./scripts";
 import { installServicePs1, installServiceSh, removeServicePs1, systemdUnit, winswConfig } from "./service";
 import { backupPs1, backupSh, backupTimer, firewallPs1, firewallSh } from "./ops";
-import { mkdirSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
 
 export type FileMap = Record<string, string>;
 
@@ -79,6 +77,10 @@ regenera el server tras cambiarla.
 /**
  * Proyecto completo del server: mismos ficheros que apply escribe en disco.
  * targetOS controla qué scripts van (por defecto, ambos).
+ *
+ * Este módulo y todo `generators/` es **puro**: no importa `node:*`, no toca el
+ * disco ni la red, y no lanza. La E/S vive en `src/output.ts`, como el núcleo de
+ * DistroForge, que no tiene una sola referencia a `std::fs`/`std::env`.
  */
 export function generateProject(cfg: ServerConfig, plan: DownloadPlan, cores: number): FileMap {
   const engine = engineById(cfg.engine);
@@ -129,23 +131,4 @@ export function generateProject(cfg: ServerConfig, plan: DownloadPlan, cores: nu
     files["user_jvm_args.txt"] = userJvmArgsTxt(argsLine);
   }
   return files;
-}
-
-/** Escribe el FileMap en un directorio (LF en todo; CRLF solo en .bat) */
-export function writeProject(dir: string, files: FileMap): void {
-  mkdirSync(dir, { recursive: true });
-  for (const [name, content] of Object.entries(files)) {
-    const parent = name.split("/").slice(0, -1).join("/");
-    if (parent) mkdirSync(join(dir, parent), { recursive: true });
-    const eol = name.endsWith(".bat") ? "\r\n" : "\n";
-    writeFileSync(join(dir, name), content.replace(/\n/g, eol));
-  }
-}
-
-/** Zip del proyecto (para compartir/portar a otra máquina) */
-export async function zipProject(files: FileMap): Promise<Buffer> {
-  const JSZip = (await import("jszip")).default;
-  const zip = new JSZip();
-  for (const [name, content] of Object.entries(files)) zip.file(name, content);
-  return zip.generateAsync({ type: "nodebuffer" });
 }

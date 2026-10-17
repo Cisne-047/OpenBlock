@@ -80,21 +80,41 @@ El guiado ofrece el doctor al terminar la instalación (cuando la pregeneración
 ```
 src/
   catalog.ts        engines, plugins/mods por loader+versión, mapa Java/MC
+  version.ts        fuente única de la versión (banner, user agent, scripts)
   hw/               detección (CIM/PowerShell en Windows, /proc+lsblk en Linux), tiers, bench
   api/              Mojang piston-meta, PaperMC fill v3, Purpur, Fabric/Quilt meta,
                     Forge maven+promos, NeoForge maven, Modrinth v2 (+mrpack, CurseForge)
-  generators/       jvm.ts (Aikar/ZGC), properties.ts, paper.ts, scripts.ts,
-                    service.ts, ops.ts (firewall+backup), index.ts (FileMap+zip)
+  generators/       PURO: jvm.ts (Aikar/ZGC), properties.ts, paper.ts, scripts.ts,
+                    service.ts, ops.ts (firewall+backup), index.ts (FileMap)
+  output.ts         E/S: escribir el FileMap a disco y empaquetarlo en zip
   plan.ts           manifiesto de descargas (builds exactas + custom items) resuelto por API
   apply.ts          ejecuta: escribe, baja, instala, pregenera por RCON
   doctor.ts         mini-IA: reglas estáticas + de log, boot test, fixes, score
   guided.ts         wizard · advanced.ts flags · index.ts CLI · rcon.ts · ui.ts (estilo MC)
-tests/              vitest: tiers, flags Aikar exactos, properties, rcon codec, mrpack, doctor
+tests/              vitest (62): tiers, flags Aikar exactos, properties, rcon codec,
+                    mrpack, doctor, pureza del núcleo y barrido de "undefined"
 ```
+
+`generators/` no importa `node:*` ni lanza: construye contenido y nada más. La E/S
+está en `output.ts` y `apply.ts`. `tests/purity.test.ts` lo comprueba, así que la
+regla no depende de que alguien se acuerde.
 
 ## Por qué existe
 
 DistroForge te forja la distro; OpenBlock te forja el server que corre en ella.
 Ambos comparten idea: **config declarativa + generadores puros → proyecto ejecutable**.
-Siguiente hito: port conjunto a Rust cuando estén feature-complete (la suite vitest
-y el `doctor --json` son el contrato de verificación pre/post port).
+
+DistroForge **ya completó su port a Rust** (v0.4.0): su núcleo es `forge-core`, y
+la app React/TS original quedó en `legacy/` como referencia y suite de paridad.
+Su paridad no la sostiene un fichero de versión —no lo tiene— sino tres cosas:
+
+1. **Serialización byte-estable**: el orden de campos del struct replica el de la
+   interfaz TS, porque `JSON.stringify` y serde serializan en orden de declaración.
+2. **Suite espejo**: 77 tests en Rust frente a los 74 del TS, con los mismos
+   invariantes (reimportar `distroforge.json`, validar la config por defecto).
+3. **Un `diff -r` documentado**: generar el mismo proyecto con las dos
+   implementaciones y comparar; byte a byte idénticos.
+
+OpenBlock prepara ese camino: núcleo puro, generadores deterministas y
+`doctor --json` como contrato de verificación.
+

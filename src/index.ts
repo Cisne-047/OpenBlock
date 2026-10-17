@@ -4,7 +4,8 @@ import { advanced, backupCommand, buildAdvancedConfig, parseAdvancedArgs, stopCo
 import { runBenchmark } from "./hw/bench";
 import { detectHardware } from "./hw/detect";
 import { classifyHardware, recommendedRamMB } from "./hw/tiers";
-import { generateProject, writeProject, zipProject } from "./generators";
+import { generateProject } from "./generators";
+import { writeProject, zipProject } from "./output";
 import { guided } from "./guided";
 import type { ServerConfig } from "./types";
 import { c, kvTable, banner } from "./ui";

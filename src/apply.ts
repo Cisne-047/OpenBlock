@@ -9,7 +9,8 @@ import { downloadTo, fmtBytes } from "./net/http";
 import { buildDownloadPlan, type DownloadPlan } from "./plan";
 import { withRcon } from "./rcon";
 import { achievement, c, progressBar } from "./ui";
-import { generateProject, validate, writeProject } from "./generators";
+import { generateProject, validate } from "./generators";
+import { writeProject } from "./output";
 import type { ServerConfig } from "./types";
 
 /**

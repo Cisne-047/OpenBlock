@@ -1,4 +1,5 @@
 import { httpJson } from "../net/http";
+import { USER_AGENT } from "../version";
 
 /**
  * Resolución de descargas por engine. Cada motor devuelve la URL del jar a
@@ -174,7 +175,7 @@ export async function quiltDownload(mc: string, loaderBuild?: string, installerB
 /** builds de Forge para una versión de MC (del maven-metadata; nueva primero) */
 export async function forgeBuilds(mc: string): Promise<BuildInfo[]> {
   const xml = await fetch("https://maven.minecraftforge.net/net/minecraftforge/forge/maven-metadata.xml", {
-    headers: { "User-Agent": "OpenBlock/0.1" },
+    headers: { "User-Agent": USER_AGENT },
   }).then((r) => {
     if (!r.ok) throw new Error(`Maven Forge HTTP ${r.status}`);
     return r.text();

@@ -1,4 +1,5 @@
 import readline from "node:readline/promises";
+import { shortVersion } from "./version";
 
 const enabled = process.stdout.isTTY && !process.env.NO_COLOR;
 
@@ -32,6 +33,16 @@ const SPLASHES = [
   "Folia corre en tu Ryzen, créele",
 ];
 
+/**
+ * Línea central del banner, alineada al ancho interior de la caja (42 columnas).
+ * Se calcula en vez de copiarse a mano: la versión salía duplicada aquí y en el
+ * user agent, y las dos se habían desincronizado.
+ */
+function brandLine(): string {
+  const text = `      B L O C K  ·  v${shortVersion()}`;
+  return `  ║${text}${" ".repeat(42 - text.length)}║`;
+}
+
 export function banner(): void {
   const splash = SPLASHES[Math.floor(Math.random() * SPLASHES.length)];
   console.log(c.green(`
@@ -42,7 +53,7 @@ export function banner(): void {
   ║ ██║   ██║██╔═══╝ ██╔══╝  ██║╚██╗██║      ║
   ║ ╚██████╔╝██║     ███████╗██║ ╚████║      ║
   ║  ╚═════╝ ╚═╝     ╚══════╝╚═╝  ╚═══╝      ║
-  ║      B L O C K  ·  v0.1                  ║
+${brandLine()}
   ╚══════════════════════════════════════════╝`));
   console.log(`                 ${c.yellow(splash)}\n`);
 }
