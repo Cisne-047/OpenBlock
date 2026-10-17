@@ -65,6 +65,16 @@ export interface DoctorContext {
   logLines: string[];
   bootTested: boolean;
   bootOk: boolean;
+  /**
+   * Los tres puntos que dependen de la máquina o de la red —la versión de Java
+   * instalada, si el puerto está libre y qué publica Modrinth— se pueden inyectar.
+   * Es lo que permite comparar estas reglas contra el port con un golden: sin
+   * inyectar, el resultado depende del java del PATH y de los puertos de quien
+   * ejecute los tests. En `runDoctor` van sin poner y se usan los de verdad.
+   */
+  javaMajorOf?: (javaPath: string) => Promise<number | null>;
+  isPortFree?: (port: number) => Promise<boolean>;
+  latestVersion?: typeof latestVersion;
 }
 
 // ---------- reglas sobre el log del boot ----------
@@ -298,7 +308,7 @@ export const STATIC_RULES: StaticRule[] = [
     check: async (ctx) => {
       const pathFile = join(ctx.dir, "runtime", "java.path");
       const javaPath = existsSync(pathFile) ? readFileSync(pathFile, "utf8").trim() : "java";
-      const major = await javaMajorOf(javaPath);
+      const major = await (ctx.javaMajorOf ?? javaMajorOf)(javaPath);
       const required = javaMajorFor(ctx.cfg.mcVersion);
       if (major === required) return null;
       return {
@@ -322,7 +332,7 @@ export const STATIC_RULES: StaticRule[] = [
   {
     code: "PORT_BUSY",
     check: async (ctx) => {
-      const free = await isPortFree(ctx.cfg.port);
+      const free = await (ctx.isPortFree ?? isPortFree)(ctx.cfg.port);
       if (free) return null;
       return {
         severity: "error" as const,
@@ -369,7 +379,7 @@ export const STATIC_RULES: StaticRule[] = [
         const slug = KNOWN_PLUGIN_SLUGS.find((s) => f.toLowerCase().includes(s.toLowerCase().replace(/-/g, "")));
         if (!slug) continue;
         try {
-          const v = await latestVersion(slug, { gameVersions: [ctx.cfg.mcVersion], loaders: [modrinthLoaderOf(ctx.cfg.engine)] });
+          const v = await (ctx.latestVersion ?? latestVersion)(slug, { gameVersions: [ctx.cfg.mcVersion], loaders: [modrinthLoaderOf(ctx.cfg.engine)] });
           const latest = primaryFile(v).filename;
           if (latest && latest !== f) {
             return {
@@ -399,6 +409,24 @@ export const STATIC_RULES: StaticRule[] = [
     },
   },
 ];
+
+/**
+ * Evalúa las reglas estáticas sobre un directorio (`runDoctor`, paso 1).
+ *
+ * Separada de `runDoctor` para poder compararla con el port, y con los tres puntos
+ * que dependen de la máquina inyectables: sin eso, el resultado de un test
+ * dependería del java del PATH, de los puertos ocupados y de lo que Modrinth
+ * publique ese día. El orden de salida es el de `STATIC_RULES`, y una regla que no
+ * encuentra nada devuelve `null` y no aparece.
+ */
+export async function evaluateStaticRules(ctx: DoctorContext): Promise<Finding[]> {
+  const out: Finding[] = [];
+  for (const rule of STATIC_RULES) {
+    const f = await rule.check(ctx);
+    if (f) out.push(f);
+  }
+  return out;
+}
 
 const KNOWN_PLUGIN_SLUGS = ["chunky", "spark", "chunkyborder", "luckperms"];
 
@@ -558,10 +586,6 @@ export async function runDoctor(
   const applied: string[] = [];
   const pending: string[] = [];
 
-  const collect = async (f: Finding | null) => {
-    if (f) findings.push(f);
-  };
-
   const applySafe = async (fs: Finding[]): Promise<void> => {
     for (const f of fs) {
       if (!f.fix || f.fix.considerable) continue;
@@ -573,7 +597,7 @@ export async function runDoctor(
 
   // 1) estáticas pre-boot + fixes seguros YA (que el boot test arranque limpio).
   // En readOnly no se aplica nada: el diagnóstico solo informa.
-  for (const rule of STATIC_RULES) await collect(await rule.check(ctx));
+  for (const f of await evaluateStaticRules(ctx)) findings.push(f);
   const safeStatic = findings.filter((f) => f.fix && !f.fix.considerable);
   if (safeStatic.length && !opts.readOnly) await applySafe(safeStatic);
 

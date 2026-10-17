@@ -46,7 +46,8 @@ vigila al otro lado. `forge-api` es el único que hace red, igual que en el TS s
 | `plan` (resolver el manifiesto) | pendiente |
 | `doctor` (aritmética: score, nota, dedupe) | portado |
 | `doctor` (reglas de log) | portado, con sus descripciones |
-| `doctor` (reglas estáticas, boot, arreglos) | pendiente |
+| `doctor` (reglas estáticas) | portado, con la vista y los hechos inyectados |
+| `doctor` (boot test y arreglos) | pendiente |
 | CLI | `detect`, `plan`, `dump`, `latest` y `rcon` funcionan |
 
 **El núcleo generador está completo y con paridad byte a byte**: los 23 ficheros
@@ -112,6 +113,13 @@ Lo que la paridad ha cazado, y que ninguna lectura del código habría visto:
   codificador de la query de Modrinth con el conjunto «seguro» de memoria y el
   caso de `~` lo cantó: `a b~*` sale `a+b%7E*`, no `a+b~*`. Dos codificadores
   distintos en el mismo fichero del TS, y ninguno es el que uno recuerda.
+- **El `$` de JS casa antes de un `\r` y el de Rust no.** `jarNameFromStartScript`
+  busca `^set "JAR=(.+)"$` en el `start.bat`, y un `.bat` se escribe con finales
+  CRLF. En JS el `$` multilínea también casa antes de `\r`, así que funciona; en
+  Rust el `\r` queda dentro de la línea y el patrón no casa. Sin el `\r?`, el
+  doctor habría dicho «falta el jar del engine» en **todos** los proyectos
+  generados en Windows. Lo cazó el test del propio port, no el golden: el golden
+  escribe los fixtures con LF.
 - **El regex de `parseMc`**, tres veces. Mis tres lecturas eran falsas.
 - **Dos líneas en blanco de diferencia** en `install.sh` e `install.ps1`. No era
   lógica: cuando **no** hay installer, la línea de apertura del ternario del
@@ -204,7 +212,7 @@ Deliberadas y anotadas, como la lista que DistroForge mantiene en su
 | fichero TS | líneas | a dónde va | por qué |
 |---|---|---|---|
 | `src/api/modrinth.ts` | 126 | `forge-api` (la query y la elección) | falta la descarga del `.mrpack` y descomprimir el zip |
-| `src/doctor.ts` | 629 | `forge-cli` (aritmética y reglas de log ya en el núcleo) | quedan las 7 reglas estáticas, el boot test y los `apply` |
+| `src/doctor.ts` | 629 | `forge-cli` (aritmética, reglas de log y estáticas ya en el núcleo) | quedan el boot test, los `apply` y el subcomando |
 | `src/apply.ts`, `java.ts` | 360 | `forge-cli` | escritura, descargas, JDK |
 | `src/advanced.ts`, `guided.ts`, `index.ts` | 729 | `forge-cli` | la CLI completa |
 

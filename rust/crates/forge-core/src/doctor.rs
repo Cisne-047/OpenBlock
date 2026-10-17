@@ -8,6 +8,14 @@
 //! Aquí viven también las **reglas de log** como datos y su evaluación: son texto
 //! de entrada y hallazgos de salida, sin tocar nada. Lo que se queda en el CLI es
 //! el `apply` de cada fix, que sí escribe ficheros y arranca procesos.
+//!
+//! Las **reglas estáticas** son puras por el mismo motivo, pero necesitan mirar el
+//! directorio y preguntar dos o tres cosas a la máquina: eso entra por dos traits
+//! (`VistaServidor` y `Hechos`), así que el núcleo sigue sin tocar el disco ni
+//! arrancar un proceso.
+
+use crate::modrinth::ModrinthVersion;
+use crate::types::EngineId;
 
 /// Gravedad de un hallazgo (`Severity`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -367,4 +375,346 @@ pub fn evaluar_log(lines: &[String], ctx: &ContextoLog) -> Vec<Finding> {
         });
     }
     out
+}
+
+// ---------- reglas estáticas (ficheros + entorno) ----------
+
+/// Lo que las reglas estáticas leen del directorio del server.
+///
+/// Es un trait y no `std::fs` porque el núcleo no toca el disco: así las reglas son
+/// comparables contra el TS con un directorio de mentira, y el CLI pone la
+/// implementación de verdad.
+pub trait VistaServidor {
+    /// `existsSync`
+    fn existe(&self, rel: &str) -> bool;
+    /// `readFile`. `None` si no se puede leer.
+    fn leer(&self, rel: &str) -> Option<String>;
+    /// `readdir`. `None` si el directorio no está.
+    fn listar(&self, rel: &str) -> Option<Vec<String>>;
+}
+
+/// Lo que las reglas preguntan a la máquina o a la red.
+///
+/// Son los tres puntos que en el TS se inyectan en el contexto
+/// (`javaMajorOf`, `isPortFree`, `latestVersion`) para que el resultado no dependa
+/// del java del PATH, de los puertos ocupados ni de lo que Modrinth publique hoy.
+pub trait Hechos {
+    /// `javaMajorOf(javaPath)`; `None` = no se pudo averiguar.
+    fn java_mayor(&self, ruta_java: &str) -> Option<u32>;
+    /// `isPortFree(puerto)`.
+    fn puerto_libre(&self, puerto: u16) -> bool;
+    /// `latestVersion(slug, …)`; `None` donde el TS lanzaría y el `catch` lo traga.
+    fn ultima_version(&self, slug: &str, mc: &str, loader: &str) -> Option<ModrinthVersion>;
+}
+
+/// Lo que las reglas estáticas leen de la config.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ContextoEstatico {
+    pub mc_version: String,
+    pub port: u16,
+    pub engine: EngineId,
+    /// El directorio como se le enseña al usuario: sale tal cual en el `source` de
+    /// `ENGINE_JAR_MISSING`, así que el port tiene que pasar el mismo que el TS.
+    pub dir: String,
+}
+
+/// Una regla estática (`StaticRule`), sin el `apply` de su fix.
+pub struct StaticRule {
+    pub code: &'static str,
+    pub check: fn(&dyn VistaServidor, &ContextoEstatico, &dyn Hechos) -> Option<Finding>,
+}
+
+/// Las reglas estáticas, en su orden.
+pub const STATIC_RULES: &[StaticRule] = &[
+    StaticRule {
+        code: "EULA_FILE",
+        check: regla_eula_file,
+    },
+    StaticRule {
+        code: "SYNC_CHUNK_WRITES",
+        check: regla_sync_chunk_writes,
+    },
+    StaticRule {
+        code: "RCON_PASSWORD",
+        check: regla_rcon_password,
+    },
+    StaticRule {
+        code: "JAVA_MAJOR",
+        check: regla_java_major,
+    },
+    StaticRule {
+        code: "PORT_BUSY",
+        check: regla_port_busy,
+    },
+    StaticRule {
+        code: "ENGINE_JAR_MISSING",
+        check: regla_engine_jar_missing,
+    },
+    StaticRule {
+        code: "PLUGIN_UPDATE",
+        check: regla_plugin_update,
+    },
+];
+
+/// El loader que el doctor usa para preguntar por plugins.
+///
+/// **No** es el `modrinthLoader` del plan: aquí el TS hace `engine === "folia" ?
+/// "folia" : "paper"`, así que un server de fabric pregunta como si fuera paper. Es
+/// un resto de cuando el doctor solo miraba plugins de Bukkit; se reproduce igual.
+pub fn modrinth_loader_de(engine: EngineId) -> &'static str {
+    if engine == EngineId::Folia {
+        "folia"
+    } else {
+        "paper"
+    }
+}
+
+/// Los slugs que el doctor reconoce en `plugins/` (`KNOWN_PLUGIN_SLUGS`).
+pub const KNOWN_PLUGIN_SLUGS: &[&str] = &["chunky", "spark", "chunkyborder", "luckperms"];
+
+/// El jar que arranca el server según `start.sh`/`start.bat`
+/// (`jarNameFromStartScript`).
+///
+/// El `.bat` lo escribe como `set "JAR=x.jar"` y el `.sh` como `JAR="x.jar"`, así
+/// que se prueban los dos patrones sobre el fichero que exista, en ese orden.
+///
+/// El `\r?` no es decoración: el `$` de JS en modo multilínea también casa antes de
+/// un `\r`, y el de Rust no, así que sin él un `start.bat` con finales CRLF —que es
+/// como se escribe un `.bat`— no daría el jar.
+pub fn jar_name_from_start_script(v: &dyn VistaServidor) -> Option<String> {
+    let re_bat = regex::Regex::new(r#"(?m)^set "JAR=(.+)"\r?$"#).expect("patrón constante");
+    let re_sh = regex::Regex::new(r#"(?m)^JAR="(.+)"\r?$"#).expect("patrón constante");
+    for f in ["start.sh", "start.bat"] {
+        let Some(txt) = v.leer(f) else { continue };
+        if let Some(c) = re_bat.captures(&txt).or_else(|| re_sh.captures(&txt)) {
+            return Some(c[1].to_string());
+        }
+    }
+    None
+}
+
+/// Evalúa las reglas estáticas (`evaluateStaticRules`).
+///
+/// Una regla que no encuentra nada devuelve `None` y no aparece en el informe; el
+/// orden es el de `STATIC_RULES`, que es el que ve el usuario antes de las de log.
+pub fn evaluar_estaticas(
+    vista: &dyn VistaServidor,
+    ctx: &ContextoEstatico,
+    hechos: &dyn Hechos,
+) -> Vec<Finding> {
+    STATIC_RULES
+        .iter()
+        .filter_map(|r| (r.check)(vista, ctx, hechos))
+        .collect()
+}
+
+/// Constructor de hallazgos con fix, para no repetir siete veces lo mismo.
+fn hallazgo(
+    severity: Severity,
+    code: &str,
+    source: &str,
+    message: String,
+    fix: Option<(&str, String, bool)>,
+) -> Finding {
+    Finding {
+        severity,
+        code: code.to_string(),
+        message,
+        source: source.to_string(),
+        fix_code: fix.as_ref().map(|(c, _, _)| c.to_string()),
+        fix_considerable: fix.as_ref().is_some_and(|(_, _, cons)| *cons),
+        fix_description: fix.map(|(_, d, _)| d),
+    }
+}
+
+fn regla_eula_file(
+    v: &dyn VistaServidor,
+    _c: &ContextoEstatico,
+    _h: &dyn Hechos,
+) -> Option<Finding> {
+    // `includes("eula=true")`: es una subcadena, no una línea ni una igualdad
+    if v.existe("eula.txt") && v.leer("eula.txt").unwrap_or_default().contains("eula=true") {
+        return None;
+    }
+    Some(hallazgo(
+        Severity::Error,
+        "EULA_FILE",
+        "eula.txt",
+        "Falta eula=true: el server se apagaría al primer arranque.".to_string(),
+        Some(("accept-eula", "Aceptar EULA (eula=true)".to_string(), false)),
+    ))
+}
+
+fn regla_sync_chunk_writes(
+    v: &dyn VistaServidor,
+    _c: &ContextoEstatico,
+    _h: &dyn Hechos,
+) -> Option<Finding> {
+    let txt = v.leer("server.properties")?;
+    let re = regex::Regex::new("sync-chunk-writes=true").expect("patrón constante");
+    if !re.is_match(&txt) {
+        return None;
+    }
+    Some(hallazgo(
+        Severity::Warning,
+        "SYNC_CHUNK_WRITES",
+        "server.properties",
+        "sync-chunk-writes=true mata el rendimiento del IO (default de Mojang).".to_string(),
+        Some((
+            "sync-chunk-writes-off",
+            "Poner sync-chunk-writes=false".to_string(),
+            false,
+        )),
+    ))
+}
+
+fn regla_rcon_password(
+    v: &dyn VistaServidor,
+    _c: &ContextoEstatico,
+    _h: &dyn Hechos,
+) -> Option<Finding> {
+    let txt = v.leer("server.properties")?;
+    let activo = regex::Regex::new("enable-rcon=true").expect("patrón constante");
+    if !activo.is_match(&txt) {
+        return None;
+    }
+    let captura = regex::Regex::new(r"rcon.password=(.*)").expect("patrón constante");
+    let pw = captura
+        .captures(&txt)
+        .and_then(|c| c.get(1))
+        .map(|m| m.as_str().to_string())
+        .unwrap_or_default();
+    // `.length` de JS cuenta unidades UTF-16, no caracteres: un emoji son dos
+    if pw.encode_utf16().count() >= 8 {
+        return None;
+    }
+    Some(hallazgo(
+        Severity::Error,
+        "RCON_PASSWORD",
+        "server.properties",
+        "RCON habilitado con contraseña débil o vacía.".to_string(),
+        Some((
+            "rcon-password",
+            "Generar contraseña RCON aleatoria".to_string(),
+            false,
+        )),
+    ))
+}
+
+fn regla_java_major(
+    v: &dyn VistaServidor,
+    c: &ContextoEstatico,
+    h: &dyn Hechos,
+) -> Option<Finding> {
+    let ruta = match v.leer("runtime/java.path") {
+        Some(t) => t.trim().to_string(),
+        None => "java".to_string(),
+    };
+    let mayor = h.java_mayor(&ruta);
+    let requerido = crate::catalog::java_major_for(&c.mc_version);
+    if mayor == Some(requerido) {
+        return None;
+    }
+    // `major ?? "?"`
+    let texto = match mayor {
+        Some(m) => m.to_string(),
+        None => "?".to_string(),
+    };
+    Some(hallazgo(
+        Severity::Error,
+        "JAVA_MAJOR",
+        "runtime/java.path",
+        format!(
+            "Java {texto} en uso; {} requiere Java {requerido}.",
+            c.mc_version
+        ),
+        Some((
+            "install-java",
+            format!("Instalar Temurin JDK {requerido} en runtime/"),
+            false,
+        )),
+    ))
+}
+
+fn regla_port_busy(v: &dyn VistaServidor, c: &ContextoEstatico, h: &dyn Hechos) -> Option<Finding> {
+    let _ = v;
+    if h.puerto_libre(c.port) {
+        return None;
+    }
+    Some(hallazgo(
+        Severity::Error,
+        "PORT_BUSY",
+        &format!("puerto {}", c.port),
+        format!("El puerto {} ya está ocupado (¿otro server?).", c.port),
+        Some(("change-port", "Cambiar a un puerto libre".to_string(), true)),
+    ))
+}
+
+fn regla_engine_jar_missing(
+    v: &dyn VistaServidor,
+    c: &ContextoEstatico,
+    _h: &dyn Hechos,
+) -> Option<Finding> {
+    let jar = jar_name_from_start_script(v);
+    if let Some(j) = &jar {
+        if v.existe(j) {
+            return None;
+        }
+    }
+    if v.existe("run.sh") || v.existe("run.bat") {
+        return None;
+    }
+    let entre = match &jar {
+        Some(j) => format!(" ({j})"),
+        None => String::new(),
+    };
+    Some(hallazgo(
+        Severity::Error,
+        "ENGINE_JAR_MISSING",
+        &c.dir,
+        format!("Falta el jar del engine{entre}: instala de nuevo."),
+        // sin fix: no hay nada que este doctor pueda hacer por ti
+        None,
+    ))
+}
+
+fn regla_plugin_update(
+    v: &dyn VistaServidor,
+    c: &ContextoEstatico,
+    h: &dyn Hechos,
+) -> Option<Finding> {
+    let instalados = v.listar("plugins")?;
+    let loader = modrinth_loader_de(c.engine);
+    for f in instalados {
+        if !f.ends_with(".jar") {
+            continue;
+        }
+        let minuscula = f.to_lowercase();
+        let Some(slug) = KNOWN_PLUGIN_SLUGS
+            .iter()
+            .find(|s| minuscula.contains(&s.to_lowercase().replace('-', "")))
+        else {
+            continue;
+        };
+        if let Some(version) = h.ultima_version(slug, &c.mc_version, loader) {
+            if let Some(fichero) = crate::modrinth::primary_file(&version) {
+                if !fichero.filename.is_empty() && fichero.filename != f {
+                    return Some(hallazgo(
+                        Severity::Warning,
+                        "PLUGIN_UPDATE",
+                        &format!("plugins/{f}"),
+                        format!("{f} tiene versión más nueva: {}.", fichero.filename),
+                        Some((
+                            "update-plugin",
+                            format!("Actualizar a {}", fichero.filename),
+                            false,
+                        )),
+                    ));
+                }
+            }
+        }
+        // solo el primero: el doctor itera en siguientes pasadas
+        break;
+    }
+    None
 }

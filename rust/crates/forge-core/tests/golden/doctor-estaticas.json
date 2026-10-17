@@ -1,0 +1,651 @@
+{
+  "casos": [
+    {
+      "nombre": "sano",
+      "args": [
+        {
+          "archivos": {
+            "eula.txt": "eula=true\n",
+            "server.properties": "#Minecraft server properties\nsync-chunk-writes=false\nenable-rcon=false\nserver-port=25565\n",
+            "start.sh": "#!/bin/sh\nJAR=\"paper-1.20.4-499.jar\"\n",
+            "paper-1.20.4-499.jar": ""
+          },
+          "cfg": {
+            "mcVersion": "1.20.4",
+            "port": 25565,
+            "engine": "paper"
+          },
+          "hechos": {
+            "javaMayor": 17,
+            "puertoLibre": true
+          }
+        }
+      ],
+      "salida_json": "[]",
+      "error": null
+    },
+    {
+      "nombre": "sin eula",
+      "args": [
+        {
+          "archivos": {
+            "server.properties": "#Minecraft server properties\nsync-chunk-writes=false\nenable-rcon=false\nserver-port=25565\n",
+            "start.sh": "#!/bin/sh\nJAR=\"paper-1.20.4-499.jar\"\n",
+            "paper-1.20.4-499.jar": ""
+          },
+          "cfg": {
+            "mcVersion": "1.20.4",
+            "port": 25565,
+            "engine": "paper"
+          },
+          "hechos": {
+            "javaMayor": 17,
+            "puertoLibre": true
+          }
+        }
+      ],
+      "salida_json": "[{\"severity\":\"error\",\"code\":\"EULA_FILE\",\"source\":\"eula.txt\",\"message\":\"Falta eula=true: el server se apagaría al primer arranque.\",\"fix\":{\"code\":\"accept-eula\",\"description\":\"Aceptar EULA (eula=true)\",\"considerable\":false}}]",
+      "error": null
+    },
+    {
+      "nombre": "eula=false",
+      "args": [
+        {
+          "archivos": {
+            "eula.txt": "eula=false\n",
+            "server.properties": "#Minecraft server properties\nsync-chunk-writes=false\nenable-rcon=false\nserver-port=25565\n",
+            "start.sh": "#!/bin/sh\nJAR=\"paper-1.20.4-499.jar\"\n",
+            "paper-1.20.4-499.jar": ""
+          },
+          "cfg": {
+            "mcVersion": "1.20.4",
+            "port": 25565,
+            "engine": "paper"
+          },
+          "hechos": {
+            "javaMayor": 17,
+            "puertoLibre": true
+          }
+        }
+      ],
+      "salida_json": "[{\"severity\":\"error\",\"code\":\"EULA_FILE\",\"source\":\"eula.txt\",\"message\":\"Falta eula=true: el server se apagaría al primer arranque.\",\"fix\":{\"code\":\"accept-eula\",\"description\":\"Aceptar EULA (eula=true)\",\"considerable\":false}}]",
+      "error": null
+    },
+    {
+      "nombre": "eula=true en medio del texto",
+      "args": [
+        {
+          "archivos": {
+            "eula.txt": "# aceptada a mano\neula=true  \n",
+            "server.properties": "#Minecraft server properties\nsync-chunk-writes=false\nenable-rcon=false\nserver-port=25565\n",
+            "start.sh": "#!/bin/sh\nJAR=\"paper-1.20.4-499.jar\"\n",
+            "paper-1.20.4-499.jar": ""
+          },
+          "cfg": {
+            "mcVersion": "1.20.4",
+            "port": 25565,
+            "engine": "paper"
+          },
+          "hechos": {
+            "javaMayor": 17,
+            "puertoLibre": true
+          }
+        }
+      ],
+      "salida_json": "[]",
+      "error": null
+    },
+    {
+      "nombre": "sync-chunk-writes=true",
+      "args": [
+        {
+          "archivos": {
+            "eula.txt": "eula=true\n",
+            "server.properties": "#Minecraft server properties\nsync-chunk-writes=false\nenable-rcon=false\nserver-port=25565\nsync-chunk-writes=true\n",
+            "start.sh": "#!/bin/sh\nJAR=\"paper-1.20.4-499.jar\"\n",
+            "paper-1.20.4-499.jar": ""
+          },
+          "cfg": {
+            "mcVersion": "1.20.4",
+            "port": 25565,
+            "engine": "paper"
+          },
+          "hechos": {
+            "javaMayor": 17,
+            "puertoLibre": true
+          }
+        }
+      ],
+      "salida_json": "[{\"severity\":\"warning\",\"code\":\"SYNC_CHUNK_WRITES\",\"source\":\"server.properties\",\"message\":\"sync-chunk-writes=true mata el rendimiento del IO (default de Mojang).\",\"fix\":{\"code\":\"sync-chunk-writes-off\",\"description\":\"Poner sync-chunk-writes=false\",\"considerable\":false}}]",
+      "error": null
+    },
+    {
+      "nombre": "rcon con contraseña corta",
+      "args": [
+        {
+          "archivos": {
+            "eula.txt": "eula=true\n",
+            "server.properties": "#Minecraft server properties\nsync-chunk-writes=false\nenable-rcon=false\nserver-port=25565\nenable-rcon=true\nrcon.password=abc\n",
+            "start.sh": "#!/bin/sh\nJAR=\"paper-1.20.4-499.jar\"\n",
+            "paper-1.20.4-499.jar": ""
+          },
+          "cfg": {
+            "mcVersion": "1.20.4",
+            "port": 25565,
+            "engine": "paper"
+          },
+          "hechos": {
+            "javaMayor": 17,
+            "puertoLibre": true
+          }
+        }
+      ],
+      "salida_json": "[{\"severity\":\"error\",\"code\":\"RCON_PASSWORD\",\"source\":\"server.properties\",\"message\":\"RCON habilitado con contraseña débil o vacía.\",\"fix\":{\"code\":\"rcon-password\",\"description\":\"Generar contraseña RCON aleatoria\",\"considerable\":false}}]",
+      "error": null
+    },
+    {
+      "nombre": "rcon sin contraseña",
+      "args": [
+        {
+          "archivos": {
+            "eula.txt": "eula=true\n",
+            "server.properties": "#Minecraft server properties\nsync-chunk-writes=false\nenable-rcon=false\nserver-port=25565\nenable-rcon=true\n",
+            "start.sh": "#!/bin/sh\nJAR=\"paper-1.20.4-499.jar\"\n",
+            "paper-1.20.4-499.jar": ""
+          },
+          "cfg": {
+            "mcVersion": "1.20.4",
+            "port": 25565,
+            "engine": "paper"
+          },
+          "hechos": {
+            "javaMayor": 17,
+            "puertoLibre": true
+          }
+        }
+      ],
+      "salida_json": "[{\"severity\":\"error\",\"code\":\"RCON_PASSWORD\",\"source\":\"server.properties\",\"message\":\"RCON habilitado con contraseña débil o vacía.\",\"fix\":{\"code\":\"rcon-password\",\"description\":\"Generar contraseña RCON aleatoria\",\"considerable\":false}}]",
+      "error": null
+    },
+    {
+      "nombre": "rcon con 8 justos",
+      "args": [
+        {
+          "archivos": {
+            "eula.txt": "eula=true\n",
+            "server.properties": "#Minecraft server properties\nsync-chunk-writes=false\nenable-rcon=false\nserver-port=25565\nenable-rcon=true\nrcon.password=12345678\n",
+            "start.sh": "#!/bin/sh\nJAR=\"paper-1.20.4-499.jar\"\n",
+            "paper-1.20.4-499.jar": ""
+          },
+          "cfg": {
+            "mcVersion": "1.20.4",
+            "port": 25565,
+            "engine": "paper"
+          },
+          "hechos": {
+            "javaMayor": 17,
+            "puertoLibre": true
+          }
+        }
+      ],
+      "salida_json": "[]",
+      "error": null
+    },
+    {
+      "nombre": "rcon con 7",
+      "args": [
+        {
+          "archivos": {
+            "eula.txt": "eula=true\n",
+            "server.properties": "#Minecraft server properties\nsync-chunk-writes=false\nenable-rcon=false\nserver-port=25565\nenable-rcon=true\nrcon.password=1234567\n",
+            "start.sh": "#!/bin/sh\nJAR=\"paper-1.20.4-499.jar\"\n",
+            "paper-1.20.4-499.jar": ""
+          },
+          "cfg": {
+            "mcVersion": "1.20.4",
+            "port": 25565,
+            "engine": "paper"
+          },
+          "hechos": {
+            "javaMayor": 17,
+            "puertoLibre": true
+          }
+        }
+      ],
+      "salida_json": "[{\"severity\":\"error\",\"code\":\"RCON_PASSWORD\",\"source\":\"server.properties\",\"message\":\"RCON habilitado con contraseña débil o vacía.\",\"fix\":{\"code\":\"rcon-password\",\"description\":\"Generar contraseña RCON aleatoria\",\"considerable\":false}}]",
+      "error": null
+    },
+    {
+      "nombre": "java mayor de la cuenta",
+      "args": [
+        {
+          "archivos": {
+            "eula.txt": "eula=true\n",
+            "server.properties": "#Minecraft server properties\nsync-chunk-writes=false\nenable-rcon=false\nserver-port=25565\n",
+            "start.sh": "#!/bin/sh\nJAR=\"paper-1.20.4-499.jar\"\n",
+            "paper-1.20.4-499.jar": ""
+          },
+          "cfg": {
+            "mcVersion": "1.20.4",
+            "port": 25565,
+            "engine": "paper"
+          },
+          "hechos": {
+            "javaMayor": 21,
+            "puertoLibre": true
+          }
+        }
+      ],
+      "salida_json": "[{\"severity\":\"error\",\"code\":\"JAVA_MAJOR\",\"source\":\"runtime/java.path\",\"message\":\"Java 21 en uso; 1.20.4 requiere Java 17.\",\"fix\":{\"code\":\"install-java\",\"description\":\"Instalar Temurin JDK 17 en runtime/\",\"considerable\":false}}]",
+      "error": null
+    },
+    {
+      "nombre": "java desconocido",
+      "args": [
+        {
+          "archivos": {
+            "eula.txt": "eula=true\n",
+            "server.properties": "#Minecraft server properties\nsync-chunk-writes=false\nenable-rcon=false\nserver-port=25565\n",
+            "start.sh": "#!/bin/sh\nJAR=\"paper-1.20.4-499.jar\"\n",
+            "paper-1.20.4-499.jar": ""
+          },
+          "cfg": {
+            "mcVersion": "1.20.4",
+            "port": 25565,
+            "engine": "paper"
+          },
+          "hechos": {
+            "javaMayor": null,
+            "puertoLibre": true
+          }
+        }
+      ],
+      "salida_json": "[{\"severity\":\"error\",\"code\":\"JAVA_MAJOR\",\"source\":\"runtime/java.path\",\"message\":\"Java ? en uso; 1.20.4 requiere Java 17.\",\"fix\":{\"code\":\"install-java\",\"description\":\"Instalar Temurin JDK 17 en runtime/\",\"considerable\":false}}]",
+      "error": null
+    },
+    {
+      "nombre": "java.path manda",
+      "args": [
+        {
+          "archivos": {
+            "eula.txt": "eula=true\n",
+            "server.properties": "#Minecraft server properties\nsync-chunk-writes=false\nenable-rcon=false\nserver-port=25565\n",
+            "start.sh": "#!/bin/sh\nJAR=\"paper-1.20.4-499.jar\"\n",
+            "paper-1.20.4-499.jar": "",
+            "runtime/java.path": "  /opt/jdk21/bin/java \n"
+          },
+          "cfg": {
+            "mcVersion": "1.20.4",
+            "port": 25565,
+            "engine": "paper"
+          },
+          "hechos": {
+            "javaMayor": 17,
+            "puertoLibre": true
+          }
+        }
+      ],
+      "salida_json": "[{\"severity\":\"error\",\"code\":\"JAVA_MAJOR\",\"source\":\"runtime/java.path\",\"message\":\"Java 21 en uso; 1.20.4 requiere Java 17.\",\"fix\":{\"code\":\"install-java\",\"description\":\"Instalar Temurin JDK 17 en runtime/\",\"considerable\":false}}]",
+      "error": null
+    },
+    {
+      "nombre": "mc que pide java 21",
+      "args": [
+        {
+          "archivos": {
+            "eula.txt": "eula=true\n",
+            "server.properties": "#Minecraft server properties\nsync-chunk-writes=false\nenable-rcon=false\nserver-port=25565\n",
+            "start.sh": "#!/bin/sh\nJAR=\"paper-1.20.4-499.jar\"\n",
+            "paper-1.20.4-499.jar": ""
+          },
+          "cfg": {
+            "mcVersion": "1.21.4",
+            "port": 25565,
+            "engine": "paper"
+          },
+          "hechos": {
+            "javaMayor": 17,
+            "puertoLibre": true
+          }
+        }
+      ],
+      "salida_json": "[{\"severity\":\"error\",\"code\":\"JAVA_MAJOR\",\"source\":\"runtime/java.path\",\"message\":\"Java 17 en uso; 1.21.4 requiere Java 21.\",\"fix\":{\"code\":\"install-java\",\"description\":\"Instalar Temurin JDK 21 en runtime/\",\"considerable\":false}}]",
+      "error": null
+    },
+    {
+      "nombre": "puerto ocupado",
+      "args": [
+        {
+          "archivos": {
+            "eula.txt": "eula=true\n",
+            "server.properties": "#Minecraft server properties\nsync-chunk-writes=false\nenable-rcon=false\nserver-port=25565\n",
+            "start.sh": "#!/bin/sh\nJAR=\"paper-1.20.4-499.jar\"\n",
+            "paper-1.20.4-499.jar": ""
+          },
+          "cfg": {
+            "mcVersion": "1.20.4",
+            "port": 25565,
+            "engine": "paper"
+          },
+          "hechos": {
+            "javaMayor": 17,
+            "puertoLibre": false
+          }
+        }
+      ],
+      "salida_json": "[{\"severity\":\"error\",\"code\":\"PORT_BUSY\",\"source\":\"puerto 25565\",\"message\":\"El puerto 25565 ya está ocupado (¿otro server?).\",\"fix\":{\"code\":\"change-port\",\"description\":\"Cambiar a un puerto libre\",\"considerable\":true}}]",
+      "error": null
+    },
+    {
+      "nombre": "falta el jar del engine",
+      "args": [
+        {
+          "archivos": {
+            "eula.txt": "eula=true\n",
+            "server.properties": "#Minecraft server properties\nsync-chunk-writes=false\nenable-rcon=false\nserver-port=25565\n",
+            "start.sh": "#!/bin/sh\nJAR=\"paper-1.20.4-499.jar\"\n"
+          },
+          "cfg": {
+            "mcVersion": "1.20.4",
+            "port": 25565,
+            "engine": "paper"
+          },
+          "hechos": {
+            "javaMayor": 17,
+            "puertoLibre": true
+          }
+        }
+      ],
+      "salida_json": "[{\"severity\":\"error\",\"code\":\"ENGINE_JAR_MISSING\",\"source\":\"/server\",\"message\":\"Falta el jar del engine (paper-1.20.4-499.jar): instala de nuevo.\",\"fix\":null}]",
+      "error": null
+    },
+    {
+      "nombre": "sin start.sh pero con run.sh",
+      "args": [
+        {
+          "archivos": {
+            "eula.txt": "eula=true\n",
+            "server.properties": "#Minecraft server properties\nsync-chunk-writes=false\nenable-rcon=false\nserver-port=25565\n",
+            "run.sh": "#!/bin/sh\n"
+          },
+          "cfg": {
+            "mcVersion": "1.20.4",
+            "port": 25565,
+            "engine": "paper"
+          },
+          "hechos": {
+            "javaMayor": 17,
+            "puertoLibre": true
+          }
+        }
+      ],
+      "salida_json": "[]",
+      "error": null
+    },
+    {
+      "nombre": "sin start.sh ni run.sh",
+      "args": [
+        {
+          "archivos": {
+            "eula.txt": "eula=true\n",
+            "server.properties": "#Minecraft server properties\nsync-chunk-writes=false\nenable-rcon=false\nserver-port=25565\n"
+          },
+          "cfg": {
+            "mcVersion": "1.20.4",
+            "port": 25565,
+            "engine": "paper"
+          },
+          "hechos": {
+            "javaMayor": 17,
+            "puertoLibre": true
+          }
+        }
+      ],
+      "salida_json": "[{\"severity\":\"error\",\"code\":\"ENGINE_JAR_MISSING\",\"source\":\"/server\",\"message\":\"Falta el jar del engine: instala de nuevo.\",\"fix\":null}]",
+      "error": null
+    },
+    {
+      "nombre": "plugin con actualización",
+      "args": [
+        {
+          "archivos": {
+            "eula.txt": "eula=true\n",
+            "server.properties": "#Minecraft server properties\nsync-chunk-writes=false\nenable-rcon=false\nserver-port=25565\n",
+            "start.sh": "#!/bin/sh\nJAR=\"paper-1.20.4-499.jar\"\n",
+            "paper-1.20.4-499.jar": "",
+            "plugins/spark-1.0.jar": ""
+          },
+          "cfg": {
+            "mcVersion": "1.20.4",
+            "port": 25565,
+            "engine": "paper"
+          },
+          "hechos": {
+            "javaMayor": 17,
+            "puertoLibre": true,
+            "ultimaVersion": {
+              "spark": {
+                "id": "v2",
+                "version_number": "2.0",
+                "game_versions": [
+                  "1.20.4"
+                ],
+                "loaders": [
+                  "paper"
+                ],
+                "files": [
+                  {
+                    "url": "https://cdn/spark-2.0.jar",
+                    "filename": "spark-2.0.jar",
+                    "primary": true
+                  }
+                ]
+              }
+            }
+          }
+        }
+      ],
+      "salida_json": "[{\"severity\":\"warning\",\"code\":\"PLUGIN_UPDATE\",\"source\":\"plugins/spark-1.0.jar\",\"message\":\"spark-1.0.jar tiene versión más nueva: spark-2.0.jar.\",\"fix\":{\"code\":\"update-plugin\",\"description\":\"Actualizar a spark-2.0.jar\",\"considerable\":false}}]",
+      "error": null
+    },
+    {
+      "nombre": "plugin al día",
+      "args": [
+        {
+          "archivos": {
+            "eula.txt": "eula=true\n",
+            "server.properties": "#Minecraft server properties\nsync-chunk-writes=false\nenable-rcon=false\nserver-port=25565\n",
+            "start.sh": "#!/bin/sh\nJAR=\"paper-1.20.4-499.jar\"\n",
+            "paper-1.20.4-499.jar": "",
+            "plugins/spark-2.0.jar": ""
+          },
+          "cfg": {
+            "mcVersion": "1.20.4",
+            "port": 25565,
+            "engine": "paper"
+          },
+          "hechos": {
+            "javaMayor": 17,
+            "puertoLibre": true,
+            "ultimaVersion": {
+              "spark": {
+                "id": "v2",
+                "version_number": "2.0",
+                "game_versions": [
+                  "1.20.4"
+                ],
+                "loaders": [
+                  "paper"
+                ],
+                "files": [
+                  {
+                    "url": "https://cdn/spark-2.0.jar",
+                    "filename": "spark-2.0.jar",
+                    "primary": true
+                  }
+                ]
+              }
+            }
+          }
+        }
+      ],
+      "salida_json": "[]",
+      "error": null
+    },
+    {
+      "nombre": "plugin desconocido",
+      "args": [
+        {
+          "archivos": {
+            "eula.txt": "eula=true\n",
+            "server.properties": "#Minecraft server properties\nsync-chunk-writes=false\nenable-rcon=false\nserver-port=25565\n",
+            "start.sh": "#!/bin/sh\nJAR=\"paper-1.20.4-499.jar\"\n",
+            "paper-1.20.4-499.jar": "",
+            "plugins/otro.jar": ""
+          },
+          "cfg": {
+            "mcVersion": "1.20.4",
+            "port": 25565,
+            "engine": "paper"
+          },
+          "hechos": {
+            "javaMayor": 17,
+            "puertoLibre": true
+          }
+        }
+      ],
+      "salida_json": "[]",
+      "error": null
+    },
+    {
+      "nombre": "slug sin guiones",
+      "args": [
+        {
+          "archivos": {
+            "eula.txt": "eula=true\n",
+            "server.properties": "#Minecraft server properties\nsync-chunk-writes=false\nenable-rcon=false\nserver-port=25565\n",
+            "start.sh": "#!/bin/sh\nJAR=\"paper-1.20.4-499.jar\"\n",
+            "paper-1.20.4-499.jar": "",
+            "plugins/LuckPerms-Bukkit-5.4.jar": ""
+          },
+          "cfg": {
+            "mcVersion": "1.20.4",
+            "port": 25565,
+            "engine": "paper"
+          },
+          "hechos": {
+            "javaMayor": 17,
+            "puertoLibre": true,
+            "ultimaVersion": {
+              "luckperms": {
+                "id": "v5",
+                "version_number": "5.5",
+                "game_versions": [
+                  "1.20.4"
+                ],
+                "loaders": [
+                  "paper"
+                ],
+                "files": [
+                  {
+                    "url": "https://cdn/LuckPerms-Bukkit-5.5.jar",
+                    "filename": "LuckPerms-Bukkit-5.5.jar",
+                    "primary": true
+                  }
+                ]
+              }
+            }
+          }
+        }
+      ],
+      "salida_json": "[{\"severity\":\"warning\",\"code\":\"PLUGIN_UPDATE\",\"source\":\"plugins/LuckPerms-Bukkit-5.4.jar\",\"message\":\"LuckPerms-Bukkit-5.4.jar tiene versión más nueva: LuckPerms-Bukkit-5.5.jar.\",\"fix\":{\"code\":\"update-plugin\",\"description\":\"Actualizar a LuckPerms-Bukkit-5.5.jar\",\"considerable\":false}}]",
+      "error": null
+    },
+    {
+      "nombre": "chunkyborder se confunde con chunky",
+      "args": [
+        {
+          "archivos": {
+            "eula.txt": "eula=true\n",
+            "server.properties": "#Minecraft server properties\nsync-chunk-writes=false\nenable-rcon=false\nserver-port=25565\n",
+            "start.sh": "#!/bin/sh\nJAR=\"paper-1.20.4-499.jar\"\n",
+            "paper-1.20.4-499.jar": "",
+            "plugins/ChunkyBorder-1.0.jar": ""
+          },
+          "cfg": {
+            "mcVersion": "1.20.4",
+            "port": 25565,
+            "engine": "paper"
+          },
+          "hechos": {
+            "javaMayor": 17,
+            "puertoLibre": true,
+            "ultimaVersion": {
+              "chunky": {
+                "id": "v1",
+                "version_number": "1.3",
+                "game_versions": [
+                  "1.20.4"
+                ],
+                "loaders": [
+                  "paper"
+                ],
+                "files": [
+                  {
+                    "url": "https://cdn/Chunky-1.3.146.jar",
+                    "filename": "Chunky-1.3.146.jar",
+                    "primary": true
+                  }
+                ]
+              }
+            }
+          }
+        }
+      ],
+      "salida_json": "[{\"severity\":\"warning\",\"code\":\"PLUGIN_UPDATE\",\"source\":\"plugins/ChunkyBorder-1.0.jar\",\"message\":\"ChunkyBorder-1.0.jar tiene versión más nueva: Chunky-1.3.146.jar.\",\"fix\":{\"code\":\"update-plugin\",\"description\":\"Actualizar a Chunky-1.3.146.jar\",\"considerable\":false}}]",
+      "error": null
+    },
+    {
+      "nombre": "todo junto",
+      "args": [
+        {
+          "archivos": {
+            "server.properties": "#Minecraft server properties\nsync-chunk-writes=false\nenable-rcon=false\nserver-port=25565\nsync-chunk-writes=true\nenable-rcon=true\nrcon.password=x\n",
+            "start.sh": "#!/bin/sh\nJAR=\"paper.jar\"\n",
+            "plugins/spark-1.0.jar": ""
+          },
+          "cfg": {
+            "mcVersion": "1.20.4",
+            "port": 25565,
+            "engine": "paper"
+          },
+          "hechos": {
+            "javaMayor": 8,
+            "puertoLibre": false,
+            "ultimaVersion": {
+              "spark": {
+                "id": "v2",
+                "version_number": "2.0",
+                "game_versions": [
+                  "1.20.4"
+                ],
+                "loaders": [
+                  "paper"
+                ],
+                "files": [
+                  {
+                    "url": "https://cdn/spark-2.0.jar",
+                    "filename": "spark-2.0.jar",
+                    "primary": true
+                  }
+                ]
+              }
+            }
+          }
+        }
+      ],
+      "salida_json": "[{\"severity\":\"error\",\"code\":\"EULA_FILE\",\"source\":\"eula.txt\",\"message\":\"Falta eula=true: el server se apagaría al primer arranque.\",\"fix\":{\"code\":\"accept-eula\",\"description\":\"Aceptar EULA (eula=true)\",\"considerable\":false}},{\"severity\":\"warning\",\"code\":\"SYNC_CHUNK_WRITES\",\"source\":\"server.properties\",\"message\":\"sync-chunk-writes=true mata el rendimiento del IO (default de Mojang).\",\"fix\":{\"code\":\"sync-chunk-writes-off\",\"description\":\"Poner sync-chunk-writes=false\",\"considerable\":false}},{\"severity\":\"error\",\"code\":\"RCON_PASSWORD\",\"source\":\"server.properties\",\"message\":\"RCON habilitado con contraseña débil o vacía.\",\"fix\":{\"code\":\"rcon-password\",\"description\":\"Generar contraseña RCON aleatoria\",\"considerable\":false}},{\"severity\":\"error\",\"code\":\"JAVA_MAJOR\",\"source\":\"runtime/java.path\",\"message\":\"Java 8 en uso; 1.20.4 requiere Java 17.\",\"fix\":{\"code\":\"install-java\",\"description\":\"Instalar Temurin JDK 17 en runtime/\",\"considerable\":false}},{\"severity\":\"error\",\"code\":\"PORT_BUSY\",\"source\":\"puerto 25565\",\"message\":\"El puerto 25565 ya está ocupado (¿otro server?).\",\"fix\":{\"code\":\"change-port\",\"description\":\"Cambiar a un puerto libre\",\"considerable\":true}},{\"severity\":\"error\",\"code\":\"ENGINE_JAR_MISSING\",\"source\":\"/server\",\"message\":\"Falta el jar del engine (paper.jar): instala de nuevo.\",\"fix\":null},{\"severity\":\"warning\",\"code\":\"PLUGIN_UPDATE\",\"source\":\"plugins/spark-1.0.jar\",\"message\":\"spark-1.0.jar tiene versión más nueva: spark-2.0.jar.\",\"fix\":{\"code\":\"update-plugin\",\"description\":\"Actualizar a spark-2.0.jar\",\"considerable\":false}}]",
+      "error": null
+    }
+  ]
+}

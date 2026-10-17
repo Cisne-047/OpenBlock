@@ -9,8 +9,9 @@
  * Uso:  npm run parity:golden
  * Test: cargo test --manifest-path rust/Cargo.toml
  */
-import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
 import { generateProject } from "../src/generators/index.js";
 import { serverProperties } from "../src/generators/properties.js";
@@ -53,7 +54,7 @@ import {
   quiltLoaderVersionsFrom,
 } from "../src/api/engines.js";
 import { planFor } from "./helpers.js";
-import { evaluateLogRules, LOG_RULES } from "../src/doctor.js";
+import { evaluateLogRules, evaluateStaticRules, LOG_RULES } from "../src/doctor.js";
 import type { DoctorContext, Finding } from "../src/doctor.js";import type { HardwareProfile, ServerConfig } from "../src/types.js";
 
 const raiz = join(fileURLToPath(new URL(".", import.meta.url)), "..");
@@ -787,6 +788,145 @@ const goldenDoctorLog = (() => {
   };
 })();
 writeFileSync(join(golden, "doctor-log.json"), JSON.stringify(goldenDoctorLog, null, 2) + "\n", "utf8");
+
+// Doctor: las reglas estáticas. Leen ficheros y preguntan tres cosas a la máquina,
+// así que el golden monta un directorio de verdad para el TS y pasa los mismos
+// ficheros (y los mismos hechos) al port por una vista en memoria. Las tres
+// preguntas van inyectadas: sin eso, el resultado dependería del java del PATH, de
+// los puertos ocupados y de lo que Modrinth publique hoy.
+const goldenDoctorEstaticas = (() => {
+  const captura = (nombre: string, args: unknown[], fn: () => unknown) => {
+    try {
+      return { nombre, args, salida_json: JSON.stringify(fn()) ?? "null", error: null as string | null };
+    } catch (e) {
+      return { nombre, args, salida_json: null, error: e instanceof Error ? e.message : String(e) };
+    }
+  };
+  const proyecta = (f: Finding) => ({
+    severity: f.severity,
+    code: f.code,
+    source: f.source,
+    message: f.message,
+    fix: f.fix ? { code: f.fix.code, description: f.fix.description, considerable: f.fix.considerable } : null,
+  });
+
+  const base = mkdtempSync(join(tmpdir(), "openblock-estaticas-"));
+  const DIR_TOKEN = "/server";
+  const serverProperties = (extra: Record<string, string> = {}) =>
+    ["#Minecraft server properties", "sync-chunk-writes=false", "enable-rcon=false", "server-port=25565", ...Object.entries(extra).map(([k, v]) => `${k}=${v}`), ""].join("\n");
+
+  /** Un caso: ficheros del directorio, config y los hechos que se inyectan. */
+  const caso = (nombre: string, archivos: Record<string, string>, cfg: Record<string, unknown>, hechos: Record<string, unknown>) => {
+    const dir = join(base, nombre.replace(/[^\w-]/g, "_"));
+    mkdirSync(dir, { recursive: true });
+    const cfgFinal = { mcVersion: "1.20.4", port: 25565, engine: "paper", ...cfg };
+    for (const [rel, contenido] of Object.entries(archivos)) {
+      // `undefined` = el fichero no está (así se quita uno de los del caso «sano»)
+      if (contenido === undefined) continue;
+      const p = join(dir, rel);
+      mkdirSync(dirname(p), { recursive: true });
+      writeFileSync(p, contenido as string, "utf8");
+    }
+    const ctx: DoctorContext = {
+      cfg: cfgFinal as unknown as ServerConfig,
+      dir,
+      logLines: [],
+      bootTested: false,
+      bootOk: false,
+      // el doble de `javaMajorOf` depende de la RUTA: así el caso de `java.path`
+      // comprueba que se lee y se recorta, no solo que se llame
+      javaMajorOf: async (ruta: string) => (ruta.includes("jdk21") ? 21 : ((hechos.javaMayor ?? null) as number | null)),
+      isPortFree: async () => Boolean(hechos.puertoLibre),
+      latestVersion: (async (slug: string) => {
+        const tabla = (hechos.ultimaVersion ?? {}) as Record<string, unknown>;
+        if (!(slug in tabla)) throw new Error(`sin versión de ${slug}`);
+        return tabla[slug];
+      }) as never,
+    };
+    return evaluateStaticRules(ctx).then((hallazgos) =>
+      captura(nombre, [{ archivos, cfg: cfgFinal, hechos }], () =>
+        hallazgos.map((f) => proyecta({ ...f, source: f.source.split(dir).join(DIR_TOKEN) }))
+      )
+    );
+  };
+
+  const sano = {
+    "eula.txt": "eula=true\n",
+    "server.properties": serverProperties(),
+    "start.sh": '#!/bin/sh\nJAR="paper-1.20.4-499.jar"\n',
+    "paper-1.20.4-499.jar": "",
+  };
+  const hechosSanos = { javaMayor: 17, puertoLibre: true };
+
+  return Promise.all([
+    caso("sano", sano, {}, hechosSanos),
+    caso("sin eula", { ...sano, "eula.txt": undefined as never }, {}, hechosSanos),
+    caso("eula=false", { ...sano, "eula.txt": "eula=false\n" }, {}, hechosSanos),
+    // `includes("eula=true")`: es una subcadena, así que esto pasa
+    caso("eula=true en medio del texto", { ...sano, "eula.txt": "# aceptada a mano\neula=true  \n" }, {}, hechosSanos),
+    caso("sync-chunk-writes=true", { ...sano, "server.properties": serverProperties({ "sync-chunk-writes": "true" }) }, {}, hechosSanos),
+    caso("rcon con contraseña corta", { ...sano, "server.properties": serverProperties({ "enable-rcon": "true", "rcon.password": "abc" }) }, {}, hechosSanos),
+    caso("rcon sin contraseña", { ...sano, "server.properties": serverProperties({ "enable-rcon": "true" }) }, {}, hechosSanos),
+    // 8 es el corte: `pw.length >= 8` no avisa
+    caso("rcon con 8 justos", { ...sano, "server.properties": serverProperties({ "enable-rcon": "true", "rcon.password": "12345678" }) }, {}, hechosSanos),
+    caso("rcon con 7", { ...sano, "server.properties": serverProperties({ "enable-rcon": "true", "rcon.password": "1234567" }) }, {}, hechosSanos),
+    caso("java mayor de la cuenta", sano, {}, { ...hechosSanos, javaMayor: 21 }),
+    caso("java desconocido", sano, {}, { ...hechosSanos, javaMayor: null }),
+    // la ruta se lee de runtime/java.path y se recorta
+    caso("java.path manda", { ...sano, "runtime/java.path": "  /opt/jdk21/bin/java \n" }, {}, hechosSanos),
+    caso("mc que pide java 21", sano, { mcVersion: "1.21.4" }, { ...hechosSanos, javaMayor: 17 }),
+    caso("puerto ocupado", sano, {}, { ...hechosSanos, puertoLibre: false }),
+    caso("falta el jar del engine", { ...sano, "paper-1.20.4-499.jar": undefined as never }, {}, hechosSanos),
+    caso("sin start.sh pero con run.sh", { "eula.txt": "eula=true\n", "server.properties": serverProperties(), "run.sh": "#!/bin/sh\n" }, {}, hechosSanos),
+    caso("sin start.sh ni run.sh", { "eula.txt": "eula=true\n", "server.properties": serverProperties() }, {}, hechosSanos),
+    caso(
+      "plugin con actualización",
+      { ...sano, "plugins/spark-1.0.jar": "" },
+      {},
+      { ...hechosSanos, ultimaVersion: { spark: { id: "v2", version_number: "2.0", game_versions: ["1.20.4"], loaders: ["paper"], files: [{ url: "https://cdn/spark-2.0.jar", filename: "spark-2.0.jar", primary: true }] } } }
+    ),
+    caso(
+      "plugin al día",
+      { ...sano, "plugins/spark-2.0.jar": "" },
+      {},
+      { ...hechosSanos, ultimaVersion: { spark: { id: "v2", version_number: "2.0", game_versions: ["1.20.4"], loaders: ["paper"], files: [{ url: "https://cdn/spark-2.0.jar", filename: "spark-2.0.jar", primary: true }] } } }
+    ),
+    // un plugin que el doctor no conoce no se consulta
+    caso("plugin desconocido", { ...sano, "plugins/otro.jar": "" }, {}, hechosSanos),
+    // el slug se busca con `includes` y sin guiones: `LuckPerms-Bukkit-5.4.jar` casa
+    // con `luckperms`
+    caso(
+      "slug sin guiones",
+      { ...sano, "plugins/LuckPerms-Bukkit-5.4.jar": "" },
+      {},
+      { ...hechosSanos, ultimaVersion: { luckperms: { id: "v5", version_number: "5.5", game_versions: ["1.20.4"], loaders: ["paper"], files: [{ url: "https://cdn/LuckPerms-Bukkit-5.5.jar", filename: "LuckPerms-Bukkit-5.5.jar", primary: true }] } } }
+    ),
+    // y aquí el quirk: `KNOWN_PLUGIN_SLUGS` se recorre en orden y `chunky` va antes
+    // que `chunkyborder`, así que un fichero de ChunkyBorder se consulta como
+    // `chunky` y el informe propone bajar Chunky. Se reproduce.
+    caso(
+      "chunkyborder se confunde con chunky",
+      { ...sano, "plugins/ChunkyBorder-1.0.jar": "" },
+      {},
+      { ...hechosSanos, ultimaVersion: { chunky: { id: "v1", version_number: "1.3", game_versions: ["1.20.4"], loaders: ["paper"], files: [{ url: "https://cdn/Chunky-1.3.146.jar", filename: "Chunky-1.3.146.jar", primary: true }] } } }
+    ),
+    // todo a la vez: comprueba el orden de las reglas
+    caso(
+      "todo junto",
+      {
+        "server.properties": serverProperties({ "sync-chunk-writes": "true", "enable-rcon": "true", "rcon.password": "x" }),
+        "start.sh": '#!/bin/sh\nJAR="paper.jar"\n',
+        "plugins/spark-1.0.jar": "",
+      },
+      {},
+      { javaMayor: 8, puertoLibre: false, ultimaVersion: { spark: { id: "v2", version_number: "2.0", game_versions: ["1.20.4"], loaders: ["paper"], files: [{ url: "https://cdn/spark-2.0.jar", filename: "spark-2.0.jar", primary: true }] } } }
+    ),
+  ]).then((casos) => {
+    rmSync(base, { recursive: true, force: true });
+    return { casos };
+  });
+})();
+writeFileSync(join(golden, "doctor-estaticas.json"), JSON.stringify(await goldenDoctorEstaticas, null, 2) + "\n", "utf8");
 
 console.log(
   `golden: ${Object.keys(sueltos).length} generadores de hoja + ${Object.keys(proyecto).length} ficheros de proyecto + catálogo + ${tiersGolden.casos.length} perfiles + ${rconGolden.casos.length} paquetes RCON + ${benchGolden.cpuScore.length} scores + ${modpackGolden.mrpack.length + modpackGolden.curseforge.length + modpackGolden.noModpack.length} casos de modpack + ${doctorGolden.scores.length} scores del doctor + ${goldenEngines.encode_uri_component.length + Object.values(goldenEngines).reduce((n, v) => n + (Array.isArray(v) ? v.length : 0), 0)} casos de engines`
