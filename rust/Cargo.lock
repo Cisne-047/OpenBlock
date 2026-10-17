@@ -3,9 +3,19 @@
 version = 4
 
 [[package]]
+name = "forge-api"
+version = "0.1.0"
+dependencies = [
+ "forge-core",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "forge-cli"
 version = "0.1.0"
 dependencies = [
+ "forge-api",
  "forge-core",
  "serde",
  "serde_json",

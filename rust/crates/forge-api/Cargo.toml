@@ -1,0 +1,11 @@
+[package]
+name = "forge-api"
+description = "Resolución contra las APIs de terceros (Mojang, PaperMC, Modrinth). Toca la red."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+forge-core = { path = "../forge-core" }
+serde.workspace = true
+serde_json.workspace = true

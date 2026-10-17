@@ -8,14 +8,16 @@ DistroForge mantiene su `legacy/`.
 
 ```
 crates/forge-core   núcleo generador: puro y sin E/S
-crates/forge-cli    CLI (en construcción)
+crates/forge-api    resolución contra APIs de terceros: toca la red
+crates/forge-cli    CLI: detección de hardware y escritura a disco
 ```
 
 `forge-core` no tiene una sola referencia a `std::fs`, `std::io`, `std::process`
 ni `std::env`: construir contenido es puro y toda la E/S vive en el borde. No es
 una convención escrita en un documento, es la misma que el TS cumple a rajatabla
 desde que se sacó la E/S fuera de `generators/`, y `tests/purity.test.ts` la
-vigila al otro lado.
+vigila al otro lado. `forge-api` es el único que hace red, igual que en el TS solo
+`api/` y `net/` tienen `fetch`.
 
 ## Estado
 
@@ -35,9 +37,11 @@ vigila al otro lado.
 | `hw::detect` | portado, en el CLI (toca el sistema) |
 | `rcon` (códec) | portado |
 | `hw::bench` | portado: el score, el xorshift y la medición |
-| `plan`/`api` (resolver contra las APIs) | pendiente |
+| `api::mojang` | portado (red + parte pura con fixture) |
+| `api::engines` y `api::modrinth` | pendiente |
+| `plan` (resolver el manifiesto) | pendiente |
 | doctor | pendiente |
-| CLI | `detect` y `dump` funcionan |
+| CLI | `detect`, `dump` y `latest` funcionan |
 
 **El núcleo generador está completo y con paridad byte a byte**: los 23 ficheros
 del proyecto salen idénticos al TypeScript, `openblock.json` incluido. Los tiers

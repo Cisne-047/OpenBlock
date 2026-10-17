@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["crates/forge-core", "crates/forge-cli"]
+members = ["crates/forge-core", "crates/forge-api", "crates/forge-cli"]
 
 [workspace.package]
 version = "0.1.0"

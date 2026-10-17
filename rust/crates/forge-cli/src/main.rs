@@ -23,6 +23,7 @@ fn uso() -> ExitCode {
     eprintln!();
     eprintln!("  detect [--json]                 hardware detectado (JSON igual que el TS)");
     eprintln!("  dump <config> <plan> <dir> [n]  genera el proyecto desde config y plan");
+    eprintln!("  latest                          última release de Minecraft (consulta Mojang)");
     eprintln!();
     eprintln!("El plan se obtiene del CLI de TypeScript: `openblock generate` lo escribe.");
     ExitCode::from(2)
@@ -33,7 +34,26 @@ fn main() -> ExitCode {
     match args.first().map(String::as_str) {
         Some("detect") => detect_cmd(&args[1..]),
         Some("dump") => dump_cmd(&args[1..]),
+        Some("latest") => latest_cmd(),
         _ => uso(),
+    }
+}
+
+/// Última release de Minecraft según Mojang (`latestRelease` del TS).
+///
+/// Existe para verificar la ruta de red de punta a punta: es lo único del puerto
+/// que no se puede comparar con un golden, así que se comprueba que responde y que
+/// el manifiesto se cachea.
+fn latest_cmd() -> ExitCode {
+    match forge_api::mojang::latest_release() {
+        Ok(v) => {
+            println!("{v}");
+            ExitCode::SUCCESS
+        }
+        Err(e) => {
+            eprintln!("No se pudo consultar Mojang: {e}");
+            ExitCode::FAILURE
+        }
     }
 }
 
