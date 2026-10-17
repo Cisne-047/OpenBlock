@@ -9,14 +9,16 @@
 //! - `forge detect [--json]` — hardware detectado, con el mismo JSON que el TS.
 //! - `forge plan <config.json> [plan.json]` — resuelve el manifiesto contra las APIs.
 //! - `forge dump <config.json> <plan.json> <dir> [cores]` — proyecto a disco.
+//! - `forge doctor [--dir D] [--json]` — diagnostica un server instalado.
 //!
-//! En construcción: el doctor todavía no está portado.
+//! En construcción: el boot test del doctor y los `apply` de sus fixes.
 
 mod detect;
+mod doctor;
 mod rcon;
 
 use std::fs;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
 fn uso() -> ExitCode {
@@ -27,6 +29,7 @@ fn uso() -> ExitCode {
         "  plan <config> [plan.json]       resuelve el plan contra las APIs (sin -o, a stdout)"
     );
     eprintln!("  dump <config> <plan> <dir> [n]  genera el proyecto desde config y plan");
+    eprintln!("  doctor [--dir D] [--json]       diagnostica un server instalado (solo lectura)");
     eprintln!("  latest                          última release de Minecraft (consulta Mojang)");
     eprintln!("  rcon <host> <puerto> <comando>  manda un comando por RCON (pass: OPENBLOCK_RCON_PASSWORD)");
     ExitCode::from(2)
@@ -38,6 +41,7 @@ fn main() -> ExitCode {
         Some("detect") => detect_cmd(&args[1..]),
         Some("dump") => dump_cmd(&args[1..]),
         Some("latest") => latest_cmd(),
+        Some("doctor") => doctor_cmd(&args[1..]),
         Some("plan") => plan_cmd(&args[1..]),
         Some("rcon") => rcon_cmd(&args[1..]),
         _ => uso(),
@@ -145,6 +149,113 @@ fn plan_cmd(args: &[String]) -> ExitCode {
             print!("{json}");
             ExitCode::SUCCESS
         }
+    }
+}
+
+/// `forge doctor [--dir D] [--json]`.
+///
+/// Lee `openblock.json` del directorio, como el `doctorCmd` del TS: el server tiene
+/// que estar instalado. El `serverDir` que trae el JSON puede ser de otro SO (un zip
+/// generado en Windows y abierto en Linux), así que si no existe se usa `--dir`.
+fn doctor_cmd(args: &[String]) -> ExitCode {
+    let mut dir = ".".to_string();
+    let mut json = false;
+    let mut i = 0;
+    while i < args.len() {
+        match args[i].as_str() {
+            "--json" => json = true,
+            "--dir" => {
+                i += 1;
+                match args.get(i) {
+                    Some(d) => dir = d.clone(),
+                    None => {
+                        eprintln!("--dir necesita un directorio");
+                        return ExitCode::from(2);
+                    }
+                }
+            }
+            "--boot" => {
+                // el TS lo hace por defecto; aquí todavía no está portado, y callarlo
+                // daría un informe que dice que el server arranca sin haberlo probado
+                eprintln!("El boot test todavía no está portado: usa --json o quítale --boot.");
+                return ExitCode::from(2);
+            }
+            otro => {
+                eprintln!("opción desconocida para doctor: {otro}");
+                return ExitCode::from(2);
+            }
+        }
+        i += 1;
+    }
+
+    let raiz = resolver(&dir);
+    let cfg_path = raiz.join("openblock.json");
+    let cfg_txt = match fs::read_to_string(&cfg_path) {
+        Ok(t) => t,
+        Err(_) => {
+            eprintln!(
+                "No existe {}: instala el server primero",
+                cfg_path.display()
+            );
+            return ExitCode::FAILURE;
+        }
+    };
+    let mut cfg: forge_core::ServerConfig = match serde_json::from_str(&cfg_txt) {
+        Ok(c) => c,
+        Err(e) => {
+            eprintln!("openblock.json inválido: {e}");
+            return ExitCode::FAILURE;
+        }
+    };
+    // el serverDir embebido puede ser de otra máquina
+    if !Path::new(&cfg.server_dir).exists() {
+        cfg.server_dir = raiz.to_string_lossy().to_string();
+    }
+
+    let donde = PathBuf::from(&cfg.server_dir);
+    let informe = doctor::doctor_readonly(&cfg, &donde, &[], (false, false));
+
+    if json {
+        match serde_json::to_string_pretty(&informe) {
+            Ok(s) => println!("{s}"),
+            Err(e) => {
+                eprintln!("No se pudo serializar el informe: {e}");
+                return ExitCode::FAILURE;
+            }
+        }
+    } else {
+        let (errores, avisos, infos) = doctor::contar(&informe);
+        println!("\n== Doctor: {} ({}) ==", cfg.name, cfg.engine.as_str());
+        for f in &informe.findings {
+            println!("  [{}] {} — {}", f.severity, f.code, f.message);
+        }
+        println!(
+            "\n{errores} errores, {avisos} avisos, {infos} informativos · {} ({})",
+            informe.grade, informe.score
+        );
+        if !informe.pending.is_empty() {
+            println!("\nPendiente de arreglar:");
+            for p in &informe.pending {
+                println!("  - {p}");
+            }
+        }
+    }
+    // `if (report.score < 40) process.exitCode = 1`: el corte es 40, no la nota
+    // «SANO»: un server con avisos sale con 0 para que un script lo pueda usar
+    if informe.score < 40 {
+        ExitCode::FAILURE
+    } else {
+        ExitCode::SUCCESS
+    }
+}
+
+/// `path.resolve` de Node: absoluta y sin `.`, resolviendo lo relativo contra el cwd.
+fn resolver(p: &str) -> PathBuf {
+    let ruta = Path::new(p);
+    if ruta.is_absolute() {
+        ruta.to_path_buf()
+    } else {
+        std::env::current_dir().unwrap_or_default().join(ruta)
     }
 }
 

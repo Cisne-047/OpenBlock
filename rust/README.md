@@ -47,6 +47,7 @@ vigila al otro lado. `forge-api` es el único que hace red, igual que en el TS s
 | `doctor` (aritmética: score, nota, dedupe) | portado |
 | `doctor` (reglas de log) | portado, con sus descripciones |
 | `doctor` (reglas estáticas) | portado, con la vista y los hechos inyectados |
+| `doctor` (informe, `forge doctor --json`) | portado y comparado con el TS en vivo |
 | `doctor` (boot test y arreglos) | pendiente |
 | CLI | `detect`, `plan`, `dump`, `latest` y `rcon` funcionan |
 
@@ -103,6 +104,29 @@ que salga limpio a la primera. La primera ejecución salió idéntica, aviso
 incluido (`[plan] spark: sin build para 1.20.4 (Modrinth: sin versión de spark
 para esos filtros)`), que es lo que pasa cuando el resolver se limita a
 orquestar piezas que ya tenían paridad.
+
+El **doctor** se verifica igual, y con más motivo: dos de sus siete reglas
+estáticas preguntan a la máquina (la versión de Java, si el puerto está libre) y
+una a Modrinth, así que su salida no es reproducible ni con un directorio fijo.
+Lo que sí es comparable es el informe entero de solo lectura, que es el que usan
+los scripts:
+
+```bash
+# un server de verdad, generado por el propio Rust
+cargo run -q -p forge-cli -- plan tests/fixtures/parity-config.json /tmp/plan.json
+cargo run -q -p forge-cli -- dump tests/fixtures/parity-config.json /tmp/plan.json /tmp/server
+
+# el TS imprime su banner antes del JSON: se corta desde la primera línea que es «{»
+./node_modules/.bin/tsx src/index.ts doctor --dir /tmp/server --no-boot --json | sed -n '/^{/,$p' > ts.json
+cargo run -q -p forge-cli -- doctor --dir /tmp/server --json > rs.json
+diff ts.json rs.json
+```
+
+Salen idénticos byte a byte, con el `source` absoluto de `ENGINE_JAR_MISSING`
+incluido. Ese `source` es además la prueba de que el `\r?` de
+`jarNameFromStartScript` está bien puesto: el jar que sale en el mensaje
+(`paper-1.20.4-499.jar`) se leyó del `start.bat` **con finales CRLF** que acaba
+de generar `forge dump`.
 
 Lo que la paridad ha cazado, y que ninguna lectura del código habría visto:
 

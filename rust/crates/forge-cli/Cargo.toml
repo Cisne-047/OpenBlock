@@ -14,3 +14,4 @@ forge-core = { path = "../forge-core" }
 forge-api = { path = "../forge-api" }
 serde.workspace = true
 serde_json.workspace = true
+regex.workspace = true

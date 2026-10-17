@@ -97,6 +97,7 @@ version = "0.1.0"
 dependencies = [
  "forge-api",
  "forge-core",
+ "regex",
  "serde",
  "serde_json",
 ]
