@@ -20,6 +20,7 @@ import { backupPs1, backupSh, backupTimer, firewallPs1, firewallSh } from "../sr
 import { installServicePs1, installServiceSh, removeServicePs1, systemdUnit, winswConfig } from "../src/generators/service.js";
 import { ENGINES, PERF_ITEMS, javaMajorFor, parseMc, perfItemsFor } from "../src/catalog.js";
 import { TIERS, classifyHardware, recommendedGc, recommendedRamMB } from "../src/hw/tiers.js";
+import { encodePacket } from "../src/rcon.js";
 import { planFor } from "./helpers.js";
 import type { HardwareProfile, ServerConfig } from "../src/types.js";
 
@@ -190,7 +191,31 @@ const tiersGolden = {
 };
 writeFileSync(join(golden, "tiers.json"), JSON.stringify(tiersGolden, null, 2) + "\n", "utf8");
 
+// RCON: los bytes exactos que salen del códec. Un byte mal puesto en un protocolo
+// binario no da un error legible, da un server que no responde.
+const casosRcon: Array<[number, number, string]> = [
+  [7, 3, "pass123"],
+  [1, 2, "chunky radius 4000"],
+  [2, 0, ""],
+  [1, 2, "spark tps"],
+  [0, 0, "a"],
+  [2147483647, 2, "id grande"],
+  [-1, 2, "id negativo"],
+  [1, 2, "acentué ñ"],
+  [1, 2, "con\nsalto"],
+];
+const rconGolden = {
+  casos: casosRcon.map(([id, tipo, payload]) => ({
+    id,
+    tipo,
+    payload,
+    // hex del paquete completo, que es lo comparable byte a byte
+    hex: encodePacket(id, tipo, payload).toString("hex"),
+  })),
+};
+writeFileSync(join(golden, "rcon.json"), JSON.stringify(rconGolden, null, 2) + "\n", "utf8");
+
 console.log(
-  `golden: ${Object.keys(sueltos).length} generadores de hoja + ${Object.keys(proyecto).length} ficheros de proyecto + catálogo + ${tiersGolden.casos.length} perfiles de hardware`
+  `golden: ${Object.keys(sueltos).length} generadores de hoja + ${Object.keys(proyecto).length} ficheros de proyecto + catálogo + ${tiersGolden.casos.length} perfiles + ${rconGolden.casos.length} paquetes RCON`
 );
 console.log(`en ${golden}`);

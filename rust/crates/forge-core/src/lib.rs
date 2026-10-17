@@ -26,6 +26,7 @@ pub mod catalog;
 pub mod generators;
 pub mod hw;
 pub mod plan;
+pub mod rcon;
 pub mod types;
 
 pub use catalog::LoaderKind;

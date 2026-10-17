@@ -33,6 +33,7 @@ vigila al otro lado.
 | `generators` (raíz, `generateProject`) | portado |
 | `hw::tiers` | portado |
 | `hw::detect` | portado, en el CLI (toca el sistema) |
+| `rcon` (códec) | portado |
 | `hw::bench` | pendiente |
 | `plan`/`api` (resolver contra las APIs) | pendiente |
 | doctor | pendiente |
@@ -80,6 +81,13 @@ Lo que la paridad ha cazado, y que ninguna lectura del código habría visto:
   template literal de TS (`` `${plan.installer ``) consume un salto, así que la
   salida lleva una línea en blanco de más. Un byte de diferencia en un script que
   el usuario va a ejecutar.
+- **El códec RCON arrastra un quirk del TS y hay que reproducirlo.** El TS hace
+  `Buffer.alloc(4 + 4 + Buffer.byteLength(payload) + 2)`, que mide el payload en
+  **UTF-8**, y luego `write(payload, 8, "ascii")`, que escribe **latin1** (más
+  corto). Los bytes que sobran quedan a cero: con `"acentué ñ"` declara 21 y
+  escribe 9 bytes de payload más 4 ceros. Con payload ASCII —el 100% de los
+  comandos reales— los dos cómputos coinciden y no se nota. Se reproduce igual
+  porque un puerto o es byte a byte o no es un puerto.
 
 ### La detección de hardware es otro tipo de paridad
 
