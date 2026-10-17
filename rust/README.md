@@ -34,7 +34,7 @@ vigila al otro lado.
 | `hw::tiers` | portado |
 | `hw::detect` | portado, en el CLI (toca el sistema) |
 | `rcon` (códec) | portado |
-| `hw::bench` | pendiente |
+| `hw::bench` | portado: el score, el xorshift y la medición |
 | `plan`/`api` (resolver contra las APIs) | pendiente |
 | doctor | pendiente |
 | CLI | `detect` y `dump` funcionan |
@@ -88,6 +88,16 @@ Lo que la paridad ha cazado, y que ninguna lectura del código habría visto:
   escribe 9 bytes de payload más 4 ceros. Con payload ASCII —el 100% de los
   comandos reales— los dos cómputos coinciden y no se nota. Se reproduce igual
   porque un puerto o es byte a byte o no es un puerto.
+- **El benchmark del TS usa `BigInt`, que crece sin límite, y hay que crecer con
+  él.** `x ^= x << 13n` **no desborda**: tras 1000 pasos el estado tiene 168 bits,
+  no 64. Con `u64` la divergencia aparece ya en el primer paso, así que el núcleo
+  lleva una implementación mínima de enteros de precisión arbitraria (las cuatro
+  operaciones que hacen falta, sin traer una librería).
+  - De paso deja un dato sobre el TS: dentro del bucle de 1.8 s el estado no para
+    de crecer, así que el coste por iteración aumenta y el `ops/core/ms` que
+    produce el benchmark no es una medida estable de la CPU. Se reproduce tal cual
+    —el puerto no es el sitio para arreglar el original— y `classifyHardware` ya lo
+    usa con un tope de 10 puntos, así que el efecto en la clasificación es acotado.
 
 ### La detección de hardware es otro tipo de paridad
 

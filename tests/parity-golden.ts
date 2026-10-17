@@ -215,7 +215,75 @@ const rconGolden = {
 };
 writeFileSync(join(golden, "rcon.json"), JSON.stringify(rconGolden, null, 2) + "\n", "utf8");
 
+// Benchmark: la fórmula del score y el algoritmo puro. Los números crudos de un
+// benchmark no son reproducibles ni entre dos ejecuciones de la misma
+// implementación, así que lo comparable es la aritmética y el xorshift.
+//
+// La fórmula replica `workerScore` de `src/hw/bench.ts:45`:
+//   Math.round(Number(total / BigInt(cores)) / elapsed)
+// y `diskWriteTest` de `:67`:
+//   Math.max(1, Math.round(TOTAL / 1048576 / secs))
+// Se repite aquí en vez de exportarla porque no merece una API pública en el
+// fuente; el test de paridad del lado Rust es quien la vigila.
+const scoreCpu = (total: bigint, cores: number, elapsed: number): number =>
+  Math.round(Number(total / BigInt(Math.max(1, cores))) / Math.max(1, elapsed));
+const scoreDisco = (bytes: number, secs: number): number => Math.max(1, Math.round(bytes / 1048576 / secs));
+
+/** Un paso del xorshift de `WORKER_SRC` (src/hw/bench.ts:21-22). */
+function xorshift(x: bigint): bigint {
+  x ^= x << 13n;
+  x ^= x >> 7n;
+  x ^= x << 17n;
+  if ((x & 1n) === 1n) x += 0x9e3779b97f4a7c15n;
+  return x;
+}
+const xorshiftN = (semilla: bigint, pasos: number): string => {
+  let x = semilla;
+  for (let i = 0; i < pasos; i++) x = xorshift(x);
+  return x.toString();
+};
+
+const benchGolden = {
+  // (totalOps, cores, elapsedMs) -> score
+  cpuScore: (
+    [
+      [72000n, 8, 1800],
+      [7000n, 1, 1],
+      [1n, 1, 1],
+      [0n, 1, 1],
+      [123456789n, 16, 1801],
+      [100n, 0, 100],
+      [100n, 4, 0],
+      [999999999999n, 32, 1800],
+      [18446744073709551615n, 8, 1800],
+    ] as Array<[bigint, number, number]>
+  ).map(([total, cores, elapsed]) => ({
+    totalOps: total.toString(),
+    cores,
+    elapsedMs: elapsed,
+    score: scoreCpu(total, cores, elapsed),
+  })),
+  diskMBs: (
+    [
+      [134217728, 1],
+      [134217728, 2],
+      [134217728, 0.5],
+      [134217728, 1000],
+      [0, 1],
+    ] as Array<[number, number]>
+  ).map(([bytes, secs]) => ({ bytes, secs, mbs: scoreDisco(bytes, secs) })),
+  // el estado final del xorshift tras N pasos: si el algoritmo difiere, esto lo ve
+  xorshift: [
+    { semilla: "3", pasos: 1 },
+    { semilla: "3", pasos: 1000 },
+    { semilla: "1", pasos: 1 },
+    { semilla: "12345678901234567", pasos: 5000 },
+    { semilla: "18446744073709551615", pasos: 777 },
+  ].map(({ semilla, pasos }) => ({ semilla, pasos, final: xorshiftN(BigInt(semilla), pasos) })),
+};
+writeFileSync(join(golden, "bench.json"), JSON.stringify(benchGolden, null, 2) + "\n", "utf8");
+
 console.log(
-  `golden: ${Object.keys(sueltos).length} generadores de hoja + ${Object.keys(proyecto).length} ficheros de proyecto + catálogo + ${tiersGolden.casos.length} perfiles + ${rconGolden.casos.length} paquetes RCON`
+  `golden: ${Object.keys(sueltos).length} generadores de hoja + ${Object.keys(proyecto).length} ficheros de proyecto + catálogo + ${tiersGolden.casos.length} perfiles + ${rconGolden.casos.length} paquetes RCON + ${benchGolden.cpuScore.length} scores + ${benchGolden.xorshift.length} xorshift`
 );
 console.log(`en ${golden}`);
