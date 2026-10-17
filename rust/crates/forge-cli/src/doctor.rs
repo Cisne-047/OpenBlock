@@ -365,7 +365,7 @@ fn aplicar_uno(f: &Finding, cfg: &mut ServerConfig, dir: &Path) -> Option<String
         }
         "disable-plugin" => {
             // el nombre sale del match del log, que es el `fix_arg` del hallazgo
-            let nombre = f.fix_arg.as_deref()?;
+            let nombre = f.fix_args.first()?;
             let plugins = dir.join("plugins");
             let destino = dir.join("plugins_disabled");
             if std::fs::create_dir_all(&destino).is_err() {
@@ -385,7 +385,28 @@ fn aplicar_uno(f: &Finding, cfg: &mut ServerConfig, dir: &Path) -> Option<String
             }
             movido
         }
-        // pendientes de portar: necesitan red (bajar el JDK, bajar el jar del plugin)
+        "update-plugin" => {
+            // los datos salen de Modrinth y los trae el hallazgo: url, nombre y
+            // (si lo hay) sha512 de la version nueva
+            let (Some(url), Some(nombre)) = (f.fix_args.first(), f.fix_args.get(1)) else {
+                return None;
+            };
+            let sha512 = f.fix_args.get(2).map(String::as_str);
+            // el jar viejo se va antes de bajar el nuevo, como en el TS
+            let _ =
+                std::fs::remove_file(dir.join("plugins").join(f.source.replace("plugins/", "")));
+            let destino = dir.join("plugins").join(nombre);
+            forge_api::net::download_to(
+                url,
+                &destino,
+                &forge_api::net::OpcionesDescarga {
+                    sha512,
+                    ..Default::default()
+                },
+            )
+            .is_ok()
+        }
+        // pendiente de portar: necesita bajar un JDK (ensureJava)
         _ => false,
     };
     if ok {
@@ -789,5 +810,89 @@ mod tests {
         assert!(!vista.existe("server.properties"));
         assert!(vista.leer("server.properties").is_none());
         assert!(vista.listar("plugins").is_none());
+    }
+}
+
+#[cfg(test)]
+mod tests_de_los_fixes {
+    use super::*;
+    use forge_core::doctor::{Finding, Severity};
+
+    /// El `update-plugin` de verdad: borra el jar viejo y baja el nuevo desde la
+    /// url que trae el hallazgo, con su sha512. Se prueba con un servidor local
+    /// porque la alternativa es esperar a que Modrinth publique una version nueva.
+    #[test]
+    fn update_plugin_borra_el_viejo_y_baja_el_nuevo() {
+        use std::io::{Read, Write};
+
+        let contenido = b"jar nuevo".to_vec();
+        let contenido_servidor = contenido.clone();
+        let sha512 = {
+            use sha2::Digest;
+            let mut h = String::new();
+            for b in sha2::Sha512::digest(&contenido) {
+                h.push_str(&format!("{b:02x}"));
+            }
+            h
+        };
+        let listener = std::net::TcpListener::bind(("127.0.0.1", 0)).unwrap();
+        let puerto = listener.local_addr().unwrap().port();
+        let hilo = std::thread::spawn(move || {
+            if let Ok((mut sock, _)) = listener.accept() {
+                let mut buf = [0u8; 1024];
+                let _ = sock.read(&mut buf);
+                let cabecera = format!(
+                    "HTTP/1.1 200 OK\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
+                    contenido.len()
+                );
+                let _ = sock.write_all(cabecera.as_bytes());
+                let _ = sock.write_all(&contenido_servidor);
+            }
+        });
+
+        let dir = std::env::temp_dir().join(format!("openblock-fix-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(dir.join("plugins")).unwrap();
+        std::fs::write(dir.join("plugins/spark-1.0.jar"), "viejo").unwrap();
+
+        let mut cfg = config_de_prueba();
+        let mut f = Finding::new(Severity::Warning, "PLUGIN_UPDATE");
+        f.source = "plugins/spark-1.0.jar".to_string();
+        f.fix_code = Some("update-plugin".to_string());
+        f.fix_args = vec![
+            format!("http://127.0.0.1:{puerto}/spark-2.0.jar"),
+            "spark-2.0.jar".to_string(),
+            sha512.clone(),
+        ];
+
+        assert_eq!(
+            aplicar_uno(&f, &mut cfg, &dir).as_deref(),
+            Some("update-plugin")
+        );
+        let _ = hilo.join();
+        assert!(
+            !dir.join("plugins/spark-1.0.jar").exists(),
+            "el viejo se va"
+        );
+        assert_eq!(
+            std::fs::read(dir.join("plugins/spark-2.0.jar")).unwrap(),
+            b"jar nuevo".to_vec()
+        );
+
+        // y con un hash que no es el suyo, no deja el fichero bueno por bueno: falla
+        let mut f2 = f.clone();
+        f2.fix_args[2] = "0".repeat(128);
+        assert!(
+            aplicar_uno(&f2, &mut cfg, &dir).is_none(),
+            "un hash malo no puede pasar"
+        );
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    fn config_de_prueba() -> ServerConfig {
+        let p = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../../tests/fixtures/parity-config.json");
+        serde_json::from_str(&std::fs::read_to_string(p).expect("la config de paridad"))
+            .expect("config válida")
     }
 }

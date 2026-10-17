@@ -8,6 +8,7 @@ license.workspace = true
 [dependencies]
 forge-core = { path = "../forge-core" }
 regex.workspace = true
+sha2 = "0.10"
 serde.workspace = true
 serde_json.workspace = true
 # leer y escribir zip: los .mrpack son zips y `--zip` produce uno. Solo `deflate`,

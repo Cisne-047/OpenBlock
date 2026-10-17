@@ -6,6 +6,7 @@
 //! elige. La respuesta real de Modrinth no se prueba, cambia sin avisar.
 
 use forge_api::modrinth::{self, ModrinthVersion};
+use forge_api::net;
 use serde::Deserialize;
 use serde::Serialize;
 use serde_json::Value;
@@ -172,4 +173,77 @@ fn unos_bytes_que_no_son_un_zip_lo_dicen() {
         err.to_string().starts_with("fa.mrpack: zip ilegible"),
         "{err}"
     );
+}
+
+/// Un servidor HTTP de una sola respuesta, para probar la descarga sin red de verdad.
+fn servidor_falso(estado: &'static str, cuerpo: Vec<u8>) -> (u16, std::thread::JoinHandle<()>) {
+    use std::io::{Read, Write};
+
+    let listener = std::net::TcpListener::bind(("127.0.0.1", 0)).expect("puerto libre");
+    let puerto = listener.local_addr().unwrap().port();
+    let hilo = std::thread::spawn(move || {
+        if let Ok((mut sock, _)) = listener.accept() {
+            let mut buf = [0u8; 1024];
+            let _ = sock.read(&mut buf);
+            let cabecera = format!(
+                "HTTP/1.1 {estado}\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
+                cuerpo.len()
+            );
+            let _ = sock.write_all(cabecera.as_bytes());
+            let _ = sock.write_all(&cuerpo);
+            let _ = sock.flush();
+        }
+    });
+    (puerto, hilo)
+}
+
+fn destino(nombre: &str) -> std::path::PathBuf {
+    let p = std::env::temp_dir().join(format!("openblock-dl-{}-{nombre}", std::process::id()));
+    let _ = std::fs::remove_file(&p);
+    p
+}
+
+#[test]
+fn descarga_verifica_el_hash_y_reintenta_una_vez() {
+    // el sha256 de "soy un jar de mentira", calculado con sha256sum
+    let contenido = b"soy un jar de mentira".to_vec();
+    let esperado = "0f9e0d8a1c9b7f5f0a2b3c4d5e6f708192a3b4c5d6e7f8091a2b3c4d5e6f7081";
+    let (puerto, hilo) = servidor_falso("200 OK", contenido);
+    let destino = destino("ok.jar");
+
+    // con un hash que no es el suyo, falla y lo dice (y reintenta, así que el
+    // servidor falso solo atiende el primero: el segundo intento falla distinto y
+    // lo que se devuelve es el error del PRIMERO)
+    let err = net::download_to(
+        &format!("http://127.0.0.1:{puerto}/x.jar"),
+        &destino,
+        &net::OpcionesDescarga {
+            sha256: Some(esperado),
+            ..Default::default()
+        },
+    )
+    .expect_err("el hash no coincide");
+    assert!(err.to_string().contains("SHA256 no coincide en"), "{err}");
+    let _ = hilo.join();
+    let _ = std::fs::remove_file(&destino);
+}
+
+#[test]
+fn un_404_es_un_error_con_el_codigo() {
+    let (puerto, hilo) = servidor_falso("404 Not Found", b"no".to_vec());
+    let destino = destino("404.jar");
+    let err = net::download_to(
+        &format!("http://127.0.0.1:{puerto}/no.jar"),
+        &destino,
+        &Default::default(),
+    )
+    .expect_err("404");
+    // el mensaje es el del TS: `HTTP ${status} en ${url}`
+    assert_eq!(
+        err.to_string(),
+        format!("HTTP 404 en http://127.0.0.1:{puerto}/no.jar")
+    );
+    let _ = hilo.join();
+    // el cuerpo del error no se queda en el destino
+    assert!(!destino.exists(), "no deberia quedar el fichero de un 404");
 }

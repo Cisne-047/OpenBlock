@@ -83,7 +83,7 @@ pub struct Finding {
     /// Lo que el fix necesita del match y no cabe en la descripción: el nombre del
     /// plugin que revienta (`PLUGIN_CRASH`) o el Java que pide el server
     /// (`JAVA_VERSION`). En el TS lo lleva la closure; aquí, el dato.
-    pub fix_arg: Option<String>,
+    pub fix_args: Vec<String>,
 }
 
 impl Finding {
@@ -97,7 +97,7 @@ impl Finding {
             fix_code: None,
             fix_considerable: false,
             fix_description: None,
-            fix_arg: None,
+            fix_args: Vec::new(),
         }
     }
 
@@ -107,7 +107,7 @@ impl Finding {
             fix_code: Some(fix_code.to_string()),
             fix_considerable: considerable,
             fix_description: Some(format!("descripción de {fix_code}")),
-            fix_arg: None,
+            fix_args: Vec::new(),
             ..Self::new(severity, code)
         }
     }
@@ -411,8 +411,9 @@ pub fn evaluar_log(lines: &[String], ctx: &ContextoLog) -> Vec<Finding> {
             fix_description: fix.as_ref().map(|(f, m)| (f.description)(m, ctx)),
             // el dato que la closure del TS lleva capturado: el Java que pide el
             // server, el plugin que revienta
-            fix_arg: arg_grupo(rule.code)
-                .and_then(|i| fix.as_ref().map(|(_, m)| m.grupo(i).to_string())),
+            fix_args: arg_grupo(rule.code)
+                .and_then(|i| fix.as_ref().map(|(_, m)| vec![m.grupo(i).to_string()]))
+                .unwrap_or_default(),
         });
     }
     out
@@ -566,7 +567,8 @@ fn hallazgo(
         fix_considerable: fix.as_ref().is_some_and(|(_, _, cons)| *cons),
         fix_description: fix.map(|(_, d, _)| d),
         // las reglas estáticas no capturan nada: su fix sale de la config
-        fix_arg: None,
+        // (la de PLUGIN_UPDATE lo rellena después con lo que devolvió Modrinth)
+        fix_args: Vec::new(),
     }
 }
 
@@ -742,7 +744,9 @@ fn regla_plugin_update(
         if let Some(version) = h.ultima_version(slug, &c.mc_version, loader) {
             if let Some(fichero) = crate::modrinth::primary_file(&version) {
                 if !fichero.filename.is_empty() && fichero.filename != f {
-                    return Some(hallazgo(
+                    // el fix necesita la url, el nombre y el hash de la version nueva:
+                    // en el TS los lleva la closure, aqui van como datos
+                    let mut hallazgo = hallazgo(
                         Severity::Warning,
                         "PLUGIN_UPDATE",
                         &format!("plugins/{f}"),
@@ -752,7 +756,12 @@ fn regla_plugin_update(
                             format!("Actualizar a {}", fichero.filename),
                             false,
                         )),
-                    ));
+                    );
+                    hallazgo.fix_args = vec![fichero.url.clone(), fichero.filename.clone()];
+                    if let Some(h) = fichero.hashes.as_ref().and_then(|h| h.sha512.clone()) {
+                        hallazgo.fix_args.push(h);
+                    }
+                    return Some(hallazgo);
                 }
             }
         }
