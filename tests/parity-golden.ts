@@ -21,6 +21,7 @@ import { installServicePs1, installServiceSh, removeServicePs1, systemdUnit, win
 import { ENGINES, PERF_ITEMS, javaMajorFor, parseMc, perfItemsFor } from "../src/catalog.js";
 import { TIERS, classifyHardware, recommendedGc, recommendedRamMB } from "../src/hw/tiers.js";
 import { encodePacket } from "../src/rcon.js";
+import { cfLoaderKind, mrpackServerFiles, parseCfManifest, parseMrpackIndex } from "../src/api/modrinth.js";
 import { planFor } from "./helpers.js";
 import type { HardwareProfile, ServerConfig } from "../src/types.js";
 
@@ -283,7 +284,106 @@ const benchGolden = {
 };
 writeFileSync(join(golden, "bench.json"), JSON.stringify(benchGolden, null, 2) + "\n", "utf8");
 
+// Parsers de modpack: los mismos índices que prueba `tests/protocol.test.ts`, más
+// bordes que el TS no cubre. Se guardan las ENTRADAS (el JSON) y las SALIDAS que
+// produce el TS, para que Rust haga lo mismo con lo mismo.
+const MRPACK_VALIDO = JSON.stringify({
+  formatVersion: 1,
+  game: "minecraft",
+  versionId: "1.0.0",
+  name: "Pack de prueba",
+  files: [
+    { path: "mods/lithium.jar", env: { client: "required", server: "required" }, downloads: ["https://cdn.modrinth.com/lithium.jar"], hashes: { sha1: "aa", sha512: "bb" }, fileSize: 100 },
+    { path: "mods/sodium-client.jar", env: { client: "required", server: "unsupported" }, downloads: ["https://cdn.modrinth.com/sodium.jar"], hashes: {}, fileSize: 100 },
+    { path: "config/optimizado.toml", downloads: ["https://cdn.modrinth.com/cfg.toml"], hashes: {}, fileSize: 10 },
+    { path: "mods/sin-env.jar", downloads: ["https://cdn.modrinth.com/sinenv.jar"], hashes: {}, fileSize: 5 },
+    { path: "mods/cliente-only.jar", env: { client: "required", server: "unsupported" }, downloads: [], hashes: {}, fileSize: 1 },
+  ],
+  dependencies: { minecraft: "1.21.1", "fabric-loader": "0.16.9" },
+});
+
+const CF_VALIDO = JSON.stringify({
+  manifestType: "minecraftModpack",
+  manifestVersion: 1,
+  name: "Pack CF",
+  minecraft: { version: "1.20.1", modLoaders: [{ id: "forge-47.2.0", primary: true }] },
+  files: [{ projectID: 1, fileID: 2, required: true }],
+  overrides: "overrides",
+});
+
+const modpackGolden = {
+  mrpack: [
+    { nombre: "válido del TS", json: MRPACK_VALIDO, ok: true },
+    { nombre: "formatVersion 2", json: JSON.stringify({ formatVersion: 2, versionId: "x" }), ok: false },
+    { nombre: "formatVersion ausente", json: JSON.stringify({ versionId: "x" }), ok: false },
+    { nombre: "json roto", json: "{ no es json }", ok: false },
+    { nombre: "sin ficheros", json: JSON.stringify({ formatVersion: 1, versionId: "x" }), ok: true },
+  ].map(({ nombre, json, ok }) => {
+    // Las dos llamadas se registran por separado: en el TS, `parseMrpackIndex`
+    // puede pasar y `mrpackServerFiles` reventar después (si falta `files`),
+    // porque no comprueba nada. Mezclarlas ocultaría esa diferencia.
+    try {
+      const idx = parseMrpackIndex(json);
+      try {
+        return { nombre, parseOk: true, serverOk: true, formato: idx.formatVersion, dependencias: idx.dependencies, servidor: mrpackServerFiles(idx).map((f) => f.path), parseError: null as string | null, serverError: null as string | null };
+      } catch (e) {
+        return { nombre, parseOk: true, serverOk: false, formato: idx.formatVersion, dependencias: idx.dependencies, servidor: [] as string[], parseError: null as string | null, serverError: (e as Error).message };
+      }
+    } catch (e) {
+      return { nombre, parseOk: ok && false, serverOk: false, formato: 0, dependencias: {}, servidor: [] as string[], parseError: (e as Error).message, serverError: null as string | null };
+    }
+  }),
+  curseforge: [
+    { nombre: "forge primario", json: CF_VALIDO },
+    { nombre: "neoforge primario", json: JSON.stringify({ ...JSON.parse(CF_VALIDO), minecraft: { version: "1.21", modLoaders: [{ id: "neoforge-21.1.0", primary: true }] } }) },
+    { nombre: "fabric (no es forge)", json: JSON.stringify({ ...JSON.parse(CF_VALIDO), minecraft: { version: "1.21", modLoaders: [{ id: "fabric-0.16.9", primary: true }] } }) },
+    { nombre: "sin primario", json: JSON.stringify({ ...JSON.parse(CF_VALIDO), minecraft: { version: "1.21", modLoaders: [{ id: "forge-1.0", primary: false }] } }) },
+    { nombre: "sin loaders", json: JSON.stringify({ ...JSON.parse(CF_VALIDO), minecraft: { version: "1.21", modLoaders: [] } }) },
+    { nombre: "forge con build vacío", json: JSON.stringify({ ...JSON.parse(CF_VALIDO), minecraft: { version: "1.21", modLoaders: [{ id: "forge-", primary: true }] } }) },
+  ].map(({ nombre, json }) => {
+    try {
+      const m = parseCfManifest(json);
+      const k = cfLoaderKind(m);
+      return { nombre, ok: true, engine: k?.engine ?? null, build: k?.build ?? null, mc: m.minecraft.version, ficheros: m.files.length };
+    } catch (e) {
+      return { nombre, ok: false, error: (e as Error).message, engine: null, build: null, mc: "", ficheros: 0 };
+    }
+  }),
+  // un manifest que no es de modpack: el TS lo rechaza con mensaje propio
+  noModpack: [
+    { nombre: "manifestType otro", json: JSON.stringify({ manifestType: "otro", minecraft: { version: "1", modLoaders: [] } }) },
+    { nombre: "sin manifestType", json: JSON.stringify({ minecraft: { version: "1", modLoaders: [] } }) },
+  ].map(({ nombre, json }) => {
+    try {
+      parseCfManifest(json);
+      return { nombre, ok: true, error: null as string | null };
+    } catch (e) {
+      return { nombre, ok: false, error: (e as Error).message };
+    }
+  }),
+};
+writeFileSync(join(golden, "modpack.json"), JSON.stringify(modpackGolden, null, 2) + "\n", "utf8");
+
+// Las entradas, por nombre, en un fichero aparte: Rust las necesita para repetir
+// el caso y así no hay que duplicar los JSON a mano (que es donde se cuela una
+// diferencia entre lo que se prueba y lo que se dijo que se probó).
+const entradas: Record<string, string> = {
+  "mrpack-valido": MRPACK_VALIDO,
+  "mrpack-formato-2": JSON.stringify({ formatVersion: 2, versionId: "x" }),
+  "mrpack-sin-formato": JSON.stringify({ versionId: "x" }),
+  "mrpack-sin-ficheros": JSON.stringify({ formatVersion: 1, versionId: "x" }),
+  "forge primario": CF_VALIDO,
+  "neoforge primario": JSON.stringify({ ...JSON.parse(CF_VALIDO), minecraft: { version: "1.21", modLoaders: [{ id: "neoforge-21.1.0", primary: true }] } }),
+  "fabric (no es forge)": JSON.stringify({ ...JSON.parse(CF_VALIDO), minecraft: { version: "1.21", modLoaders: [{ id: "fabric-0.16.9", primary: true }] } }),
+  "sin primario": JSON.stringify({ ...JSON.parse(CF_VALIDO), minecraft: { version: "1.21", modLoaders: [{ id: "forge-1.0", primary: false }] } }),
+  "sin loaders": JSON.stringify({ ...JSON.parse(CF_VALIDO), minecraft: { version: "1.21", modLoaders: [] } }),
+  "forge con build vacío": JSON.stringify({ ...JSON.parse(CF_VALIDO), minecraft: { version: "1.21", modLoaders: [{ id: "forge-", primary: true }] } }),
+  "manifestType otro": JSON.stringify({ manifestType: "otro", minecraft: { version: "1", modLoaders: [] } }),
+  "sin manifestType": JSON.stringify({ minecraft: { version: "1", modLoaders: [] } }),
+};
+writeFileSync(join(golden, "modpack-entradas.json"), JSON.stringify(entradas, null, 2) + "\n", "utf8");
+
 console.log(
-  `golden: ${Object.keys(sueltos).length} generadores de hoja + ${Object.keys(proyecto).length} ficheros de proyecto + catálogo + ${tiersGolden.casos.length} perfiles + ${rconGolden.casos.length} paquetes RCON + ${benchGolden.cpuScore.length} scores + ${benchGolden.xorshift.length} xorshift`
+  `golden: ${Object.keys(sueltos).length} generadores de hoja + ${Object.keys(proyecto).length} ficheros de proyecto + catálogo + ${tiersGolden.casos.length} perfiles + ${rconGolden.casos.length} paquetes RCON + ${benchGolden.cpuScore.length} scores + ${modpackGolden.mrpack.length + modpackGolden.curseforge.length + modpackGolden.noModpack.length} casos de modpack`
 );
 console.log(`en ${golden}`);

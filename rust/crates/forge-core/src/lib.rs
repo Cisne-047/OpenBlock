@@ -25,6 +25,7 @@
 pub mod catalog;
 pub mod generators;
 pub mod hw;
+pub mod modrinth;
 pub mod plan;
 pub mod rcon;
 pub mod types;

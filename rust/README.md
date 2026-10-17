@@ -38,7 +38,8 @@ vigila al otro lado. `forge-api` es el único que hace red, igual que en el TS s
 | `rcon` (códec) | portado |
 | `hw::bench` | portado: el score, el xorshift y la medición |
 | `api::mojang` | portado (red + parte pura con fixture) |
-| `api::engines` y `api::modrinth` | pendiente |
+| `modrinth` (parsers de modpack) | portado |
+| `api::engines` y el cliente de Modrinth | pendiente |
 | `plan` (resolver el manifiesto) | pendiente |
 | doctor | pendiente |
 | CLI | `detect`, `dump` y `latest` funcionan |
