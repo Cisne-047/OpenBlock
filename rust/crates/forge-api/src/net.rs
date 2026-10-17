@@ -50,24 +50,56 @@ pub fn get_json<T: serde::de::DeserializeOwned>(url: &str) -> Result<T, Error> {
 
 /// Descarga una URL y devuelve el cuerpo como texto.
 pub fn get_text(url: &str) -> Result<String, Error> {
+    let bytes = curl(url, &[])?;
+    String::from_utf8(bytes).map_err(|e| Error::Red(format!("la respuesta no es UTF-8: {e}")))
+}
+
+/// Descarga una URL y devuelve los bytes tal cual.
+///
+/// Es lo que necesitan los `.mrpack`: leerlos como texto los rompería en el
+/// primer byte que no sea UTF-8 válido. El TS hace lo mismo con `arrayBuffer()`.
+pub fn get_bytes(url: &str) -> Result<Vec<u8>, Error> {
+    curl(url, &[])
+}
+
+/// Descarga una URL con cabeceras extra (la API de CurseForge pide `x-api-key`).
+pub fn get_json_con_cabeceras<T: serde::de::DeserializeOwned>(
+    url: &str,
+    cabeceras: &[(&str, &str)],
+) -> Result<T, Error> {
+    let bytes = curl(url, cabeceras)?;
+    let txt = String::from_utf8(bytes)
+        .map_err(|e| Error::Red(format!("la respuesta no es UTF-8: {e}")))?;
+    serde_json::from_str(&txt).map_err(|e| Error::Json(format!("{e} en {url}")))
+}
+
+/// Lanza curl y devuelve la salida cruda. `-f` para que un 404 sea error y no un
+/// cuerpo con la página de error, que es el fallo clásico al consumir APIs ajenas.
+fn curl(url: &str, cabeceras: &[(&str, &str)]) -> Result<Vec<u8>, Error> {
+    let mut args: Vec<String> = vec![
+        "-fsSL".to_string(), // -f: falla con HTTP >= 400; -s: sin barra; -S: errores sí; -L: sigue redirecciones
+        "--max-time".to_string(),
+        TIMEOUT.as_secs().to_string(),
+        "-A".to_string(),
+        crate::USER_AGENT.to_string(),
+    ];
+    for (k, v) in cabeceras {
+        args.push("-H".to_string());
+        args.push(format!("{k}: {v}"));
+    }
+    args.push(url.to_string());
+
     let mut hijo = Command::new("curl")
-        .args([
-            "-fsSL", // -f: falla con HTTP >= 400; -s: sin barra; -S: errores sí; -L: sigue redirecciones
-            "--max-time",
-            &TIMEOUT.as_secs().to_string(),
-            "-A",
-            crate::USER_AGENT,
-            url,
-        ])
+        .args(&args)
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .spawn()
         .map_err(|e| Error::SinCurl(e.to_string()))?;
 
-    let mut salida = String::new();
+    let mut salida = Vec::new();
     if let Some(mut out) = hijo.stdout.take() {
-        out.read_to_string(&mut salida)
+        out.read_to_end(&mut salida)
             .map_err(|e| Error::Red(e.to_string()))?;
     }
     let estado = hijo.wait().map_err(|e| Error::Red(e.to_string()))?;

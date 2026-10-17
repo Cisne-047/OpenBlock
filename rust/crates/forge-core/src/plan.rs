@@ -75,21 +75,29 @@ pub struct LocalCopy {
 }
 
 /// Manifiesto completo (`DownloadPlan`).
+///
+/// **El orden de los campos es el del JSON que escribe el TS**, y no es el del
+/// struct original de la interfaz: `buildDownloadPlan` construye un objeto parcial
+/// (`engineFilename`, `engineResolved`, y según el engine `loaderResolved` o
+/// `installer`), le añade `unresolvedCf` si hace falta y hace
+/// `{ ...plan, entries, localCopies }`. `JSON.stringify` escribe en orden de
+/// inserción, así que el `plan.json` del producto empieza por `engineFilename`.
+/// Aquí se declara igual para que los dos ficheros se puedan comparar con un diff.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct DownloadPlan {
-    pub entries: Vec<DownloadEntry>,
-    /// jar installer que hay que ejecutar con java antes del primer arranque.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub installer: Option<Installer>,
     pub engine_filename: String,
     pub engine_resolved: String,
-    /// modpacks CurseForge sin API key: pendientes de resolver a mano.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub unresolved_cf: Option<i32>,
     /// loader version detectada (fabric/quilt) para trazabilidad.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub loader_resolved: Option<String>,
+    /// jar installer que hay que ejecutar con java antes del primer arranque.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub installer: Option<Installer>,
+    /// modpacks CurseForge sin API key: pendientes de resolver a mano.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub unresolved_cf: Option<i32>,
+    pub entries: Vec<DownloadEntry>,
     /// ficheros locales del usuario a copiar al server.
     pub local_copies: Vec<LocalCopy>,
 }

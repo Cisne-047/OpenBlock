@@ -7,10 +7,10 @@
 //! Subcomandos:
 //!
 //! - `forge detect [--json]` — hardware detectado, con el mismo JSON que el TS.
+//! - `forge plan <config.json> [plan.json]` — resuelve el manifiesto contra las APIs.
 //! - `forge dump <config.json> <plan.json> <dir> [cores]` — proyecto a disco.
 //!
-//! En construcción: la resolución del plan contra las APIs (PaperMC/Modrinth) y
-//! el doctor todavía no están portados.
+//! En construcción: el doctor todavía no está portado.
 
 mod detect;
 mod rcon;
@@ -23,11 +23,12 @@ fn uso() -> ExitCode {
     eprintln!("uso: forge <comando> [opciones]");
     eprintln!();
     eprintln!("  detect [--json]                 hardware detectado (JSON igual que el TS)");
+    eprintln!(
+        "  plan <config> [plan.json]       resuelve el plan contra las APIs (sin -o, a stdout)"
+    );
     eprintln!("  dump <config> <plan> <dir> [n]  genera el proyecto desde config y plan");
     eprintln!("  latest                          última release de Minecraft (consulta Mojang)");
     eprintln!("  rcon <host> <puerto> <comando>  manda un comando por RCON (pass: OPENBLOCK_RCON_PASSWORD)");
-    eprintln!();
-    eprintln!("El plan se obtiene del CLI de TypeScript: `openblock generate` lo escribe.");
     ExitCode::from(2)
 }
 
@@ -37,6 +38,7 @@ fn main() -> ExitCode {
         Some("detect") => detect_cmd(&args[1..]),
         Some("dump") => dump_cmd(&args[1..]),
         Some("latest") => latest_cmd(),
+        Some("plan") => plan_cmd(&args[1..]),
         Some("rcon") => rcon_cmd(&args[1..]),
         _ => uso(),
     }
@@ -83,6 +85,69 @@ fn rcon_cmd(args: &[String]) -> ExitCode {
 /// Existe para verificar la ruta de red de punta a punta: es lo único del puerto
 /// que no se puede comparar con un golden, así que se comprueba que responde y que
 /// el manifiesto se cachea.
+/// `forge plan <config> [plan.json]`.
+///
+/// Este es el subcomando que hace verificable la parte que **no** puede tener
+/// golden: se ejecuta contra las mismas APIs que el TS y se comparan los dos
+/// `plan.json`. Si los dos resuelven en el mismo minuto, tienen que salir iguales
+/// byte a byte; el `diff` es la prueba.
+fn plan_cmd(args: &[String]) -> ExitCode {
+    if args.is_empty() {
+        eprintln!("uso: forge plan <config.json> [plan.json]");
+        return ExitCode::from(2);
+    }
+    let cfg_txt = match fs::read_to_string(&args[0]) {
+        Ok(t) => t,
+        Err(e) => {
+            eprintln!("No se pudo leer {}: {e}", args[0]);
+            return ExitCode::FAILURE;
+        }
+    };
+    let cfg: forge_core::ServerConfig = match serde_json::from_str(&cfg_txt) {
+        Ok(c) => c,
+        Err(e) => {
+            eprintln!("{} no es una config válida: {e}", args[0]);
+            return ExitCode::FAILURE;
+        }
+    };
+
+    let (plan, avisos) = match forge_api::plan::build_download_plan(&cfg) {
+        Ok(p) => p,
+        Err(e) => {
+            eprintln!("No se pudo resolver el plan: {e}");
+            return ExitCode::FAILURE;
+        }
+    };
+    for aviso in &avisos {
+        eprintln!("{}", aviso.0);
+    }
+
+    // el TS escribe el plan con `JSON.stringify(plan, null, 2)` y un salto final
+    let json = match serde_json::to_string_pretty(&plan) {
+        Ok(j) => format!("{j}\n"),
+        Err(e) => {
+            eprintln!("No se pudo serializar el plan: {e}");
+            return ExitCode::FAILURE;
+        }
+    };
+    match args.get(1) {
+        Some(destino) => match fs::write(destino, json) {
+            Ok(()) => {
+                println!("plan escrito en {destino}");
+                ExitCode::SUCCESS
+            }
+            Err(e) => {
+                eprintln!("No se pudo escribir {destino}: {e}");
+                ExitCode::FAILURE
+            }
+        },
+        None => {
+            print!("{json}");
+            ExitCode::SUCCESS
+        }
+    }
+}
+
 fn latest_cmd() -> ExitCode {
     match forge_api::mojang::latest_release() {
         Ok(v) => {

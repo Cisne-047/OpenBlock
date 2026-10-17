@@ -123,3 +123,53 @@ fn el_slug_de_una_url_de_modrinth() {
         );
     }
 }
+
+/// El `.mrpack` es un zip, y esa parte no la puede cubrir el golden (depende de
+/// bajar un fichero de verdad). Aquí se fabrica uno en memoria.
+fn mrpack_con(entradas: &[(&str, &str)]) -> Vec<u8> {
+    use std::io::Write;
+
+    let mut buf = Vec::new();
+    {
+        let mut w = zip::write::ZipWriter::new(std::io::Cursor::new(&mut buf));
+        let opciones = zip::write::SimpleFileOptions::default();
+        for (nombre, contenido) in entradas {
+            w.start_file(*nombre, opciones).unwrap();
+            w.write_all(contenido.as_bytes()).unwrap();
+        }
+        w.finish().unwrap();
+    }
+    buf
+}
+
+#[test]
+fn saca_el_indice_de_un_mrpack() {
+    let indice =
+        r#"{"formatVersion":1,"name":"Fabulously Optimized","versionId":"5.0","files":[]}"#;
+    let zip = mrpack_con(&[
+        ("modrinth.index.json", indice),
+        ("overrides/config.txt", "x"),
+    ]);
+    let idx = modrinth::mrpack_index_from_zip(&zip, "fa.mrpack").expect("el índice está dentro");
+    assert_eq!(idx.name, "Fabulously Optimized");
+}
+
+#[test]
+fn un_zip_sin_indice_no_es_un_mrpack() {
+    let zip = mrpack_con(&[("otra-cosa.txt", "hola")]);
+    let err = modrinth::mrpack_index_from_zip(&zip, "fa.mrpack").expect_err("no hay índice");
+    assert_eq!(
+        err.to_string(),
+        "fa.mrpack no es un modpack Modrinth (.mrpack) válido"
+    );
+}
+
+#[test]
+fn unos_bytes_que_no_son_un_zip_lo_dicen() {
+    let err =
+        modrinth::mrpack_index_from_zip(b"esto no es un zip", "fa.mrpack").expect_err("no es zip");
+    assert!(
+        err.to_string().starts_with("fa.mrpack: zip ilegible"),
+        "{err}"
+    );
+}

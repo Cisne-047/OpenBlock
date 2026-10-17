@@ -13,6 +13,7 @@ pub mod js;
 pub mod modrinth;
 pub mod mojang;
 pub mod net;
+pub mod plan;
 pub mod url;
 
 /// Identificador con el que nos presentamos a las APIs de terceros.

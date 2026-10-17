@@ -7,8 +7,12 @@
 
 use crate::net;
 use crate::url;
-use serde::Deserialize;
 use serde_json::Value;
+
+// Los tipos de la respuesta los tiene el núcleo desde el principio, que es donde
+// se parsean los modpacks; aquí se reexportan para que quien use el cliente no
+// tenga que saber en qué crate vive cada cosa.
+pub use forge_core::modrinth::{primary_file, Hashes, ModrinthFile, ModrinthVersion};
 
 /// Base de la API v2 (`MR` en el TS).
 pub const MR: &str = "https://api.modrinth.com/v2";
@@ -36,41 +40,6 @@ impl std::fmt::Display for Error {
 }
 
 impl std::error::Error for Error {}
-
-/// Un fichero de una versión (`ModrinthFile`).
-///
-/// El orden y los `skip_serializing_if` replican el del TS: `JSON.stringify`
-/// omite las claves `undefined` y escribe en orden de declaración, así que los
-/// campos opcionales que no vienen en la respuesta no pueden salir como `null`.
-#[derive(Debug, Clone, PartialEq, Eq, Deserialize, serde::Serialize)]
-pub struct ModrinthFile {
-    pub url: String,
-    pub filename: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub hashes: Option<Hashes>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub primary: Option<bool>,
-}
-
-/// Los hashes que publica Modrinth (`hashes`).
-#[derive(Debug, Clone, PartialEq, Eq, Deserialize, serde::Serialize)]
-pub struct Hashes {
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub sha1: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub sha512: Option<String>,
-}
-
-/// Una versión publicada (`ModrinthVersion`). Los nombres van en `snake_case`
-/// porque así los manda la API: aquí no hay `rename_all` que valga.
-#[derive(Debug, Clone, PartialEq, Eq, Deserialize, serde::Serialize)]
-pub struct ModrinthVersion {
-    pub id: String,
-    pub version_number: String,
-    pub game_versions: Vec<String>,
-    pub loaders: Vec<String>,
-    pub files: Vec<ModrinthFile>,
-}
 
 /// Pide la última versión de un proyecto que cumpla los filtros.
 pub fn latest_version(
@@ -137,14 +106,6 @@ pub fn modrinth_version_from(list: &Value, slug: &str) -> Result<ModrinthVersion
         .map_err(|e| Error::Mensaje(format!("respuesta de modrinth inesperada: {e}")))
 }
 
-/// El fichero marcado `primary`, o el primero. `None` solo si no hay ficheros.
-pub fn primary_file(v: &ModrinthVersion) -> Option<&ModrinthFile> {
-    v.files
-        .iter()
-        .find(|f| f.primary == Some(true))
-        .or_else(|| v.files.first())
-}
-
 /// El modpack de una URL de Modrinth: su versión más reciente y el fichero.
 pub fn modrinth_modpack_file(url: &str) -> Result<(ModrinthFile, ModrinthVersion), Error> {
     let slug = modrinth_modpack_slug(url);
@@ -153,6 +114,61 @@ pub fn modrinth_modpack_file(url: &str) -> Result<(ModrinthFile, ModrinthVersion
         .cloned()
         .ok_or_else(|| Error::Mensaje(format!("Modrinth: {slug} no tiene ficheros")))?;
     Ok((file, version))
+}
+
+/// Baja un `.mrpack` y devuelve el índice que lleva dentro.
+///
+/// Un `.mrpack` es un zip con `modrinth.index.json` en la raíz. Se lee entero en
+/// memoria, igual que el `Buffer.from(await res.arrayBuffer())` del TS: un modpack
+/// son unos MB y trocearlo complicaría el `zip` sin ganar nada.
+pub fn mrpack_index(url: &str) -> Result<forge_core::modrinth::MrpackIndex, Error> {
+    let (file, _version) = modrinth_modpack_file(url)?;
+    let bytes = net::get_bytes(&file.url)?;
+    mrpack_index_from_zip(&bytes, &file.filename)
+}
+
+/// El `modrinth.index.json` de un zip ya en memoria.
+pub fn mrpack_index_from_zip(
+    bytes: &[u8],
+    filename: &str,
+) -> Result<forge_core::modrinth::MrpackIndex, Error> {
+    use std::io::Read;
+
+    let mut zip = zip::ZipArchive::new(std::io::Cursor::new(bytes))
+        .map_err(|e| Error::Mensaje(format!("{filename}: zip ilegible: {e}")))?;
+    let mut entrada = zip.by_name("modrinth.index.json").map_err(|_| {
+        Error::Mensaje(format!(
+            "{filename} no es un modpack Modrinth (.mrpack) válido"
+        ))
+    })?;
+    let mut txt = String::new();
+    entrada
+        .read_to_string(&mut txt)
+        .map_err(|e| Error::Mensaje(format!("{filename}: modrinth.index.json ilegible: {e}")))?;
+    forge_core::modrinth::parse_mrpack_index(&txt).map_err(|e| Error::Mensaje(e.to_string()))
+}
+
+/// La URL de descarga de un fichero de CurseForge. Sin key no hay descarga
+/// directa, y el mensaje es el del TS porque es el que ve el usuario.
+pub fn curseforge_file_url(
+    key: Option<&str>,
+    project_id: i64,
+    file_id: i64,
+) -> Result<String, Error> {
+    let Some(key) = key else {
+        return Err(Error::Mensaje(format!(
+            "CurseForge necesita API key (env OPENBLOCK_CF_KEY) para bajar project {project_id} file {file_id}"
+        )));
+    };
+    let url =
+        format!("https://api.curseforge.com/v1/mods/{project_id}/files/{file_id}/download-url");
+    let data: Value =
+        net::get_json_con_cabeceras(&url, &[("x-api-key", key), ("Accept", "application/json")])
+            .map_err(|e| Error::Mensaje(format!("CF API para {project_id}/{file_id}: {e}")))?;
+    data.get("data")
+        .and_then(Value::as_str)
+        .map(str::to_string)
+        .ok_or_else(|| Error::Mensaje(format!("CF API sin data para {project_id}/{file_id}")))
 }
 
 /// El slug de una URL de Modrinth, o la propia URL si no lo parece.

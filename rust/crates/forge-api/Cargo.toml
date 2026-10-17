@@ -10,3 +10,10 @@ forge-core = { path = "../forge-core" }
 regex = "1"
 serde.workspace = true
 serde_json.workspace = true
+# leer y escribir zip: los .mrpack son zips y `--zip` produce uno. Solo `deflate`,
+# que es lo que usan los modpacks; nada de bzip2/zstd/aes.
+zip = { version = "2", default-features = false, features = ["deflate"] }
+
+[dev-dependencies]
+# para fabricar un .mrpack en memoria y comprobar que se lee
+zip = { version = "2", default-features = false, features = ["deflate"] }

@@ -10,27 +10,34 @@ use serde::Deserialize;
 // ---------- Modrinth: ficheros y versiones ----------
 
 /// Un fichero de una versión (`ModrinthFile`).
-#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+///
+/// Los opcionales se **omiten** al serializar, como el `undefined` de
+/// `JSON.stringify`: `primaryFile` devuelve el objeto de la API tal cual, así que
+/// una clave que no venía no puede reaparecer como `null`.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, serde::Serialize)]
 pub struct ModrinthFile {
     pub url: String,
     pub filename: String,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub hashes: Option<Hashes>,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub primary: Option<bool>,
 }
 
 /// Hashes de un fichero. `sha1` y `sha512` pueden faltar por separado.
-#[derive(Debug, Clone, PartialEq, Eq, Default, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Default, Deserialize, serde::Serialize)]
 pub struct Hashes {
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub sha1: Option<String>,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub sha512: Option<String>,
 }
 
 /// Una versión publicada (`ModrinthVersion`).
-#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+///
+/// Los nombres van en `snake_case` porque así los manda la API: aquí no hay
+/// `rename_all` que valga.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, serde::Serialize)]
 pub struct ModrinthVersion {
     pub id: String,
     pub version_number: String,

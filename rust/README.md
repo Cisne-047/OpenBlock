@@ -30,7 +30,7 @@ vigila al otro lado. `forge-api` es el único que hace red, igual que en el TS s
 | `generators::ops` | portado |
 | `generators::service` | portado |
 | `catalog` | portado |
-| `plan` (modelo) | portado |
+| `plan` (modelo + resolver) | portado, y comparado contra el TS en vivo |
 | `generators::scripts` | portado |
 | `generators` (raíz, `generateProject`) | portado |
 | `hw::tiers` | portado |
@@ -80,6 +80,27 @@ fallo señale cuál) y el `generateProject` completo fichero a fichero (para que
 nada se quede sin comparar). El CI regenera el golden y comprueba con
 `git diff --exit-code` que está al día, así que la paridad no puede derivar en
 silencio.
+
+### Lo que no puede tener golden
+
+El resolver del plan (`src/plan.ts`) lleva el número de build y el sha256 que
+devuelve la API **ese día**: un golden sería una foto de PaperMC, no una prueba.
+Se verifica como DistroForge verifica sus APIs: ejecutando las dos
+implementaciones contra la misma API en el mismo minuto y comparando.
+
+```bash
+./node_modules/.bin/tsx tests/plan-live.ts tests/fixtures/parity-config.json > ts-plan.json
+cargo run -q --manifest-path rust/Cargo.toml -p forge-cli -- \
+  plan tests/fixtures/parity-config.json > rust-plan.json
+diff ts-plan.json rust-plan.json
+```
+
+No está en el CI —depende de que PaperMC y Modrinth estén de pie—, así que es un
+paso manual, y por eso el orden de las claves y los `dest` están escritos para
+que salga limpio a la primera. La primera ejecución salió idéntica, aviso
+incluido (`[plan] spark: sin build para 1.20.4 (Modrinth: sin versión de spark
+para esos filtros)`), que es lo que pasa cuando el resolver se limita a
+orquestar piezas que ya tenían paridad.
 
 Lo que la paridad ha cazado, y que ninguna lectura del código habría visto:
 
@@ -174,14 +195,16 @@ Deliberadas y anotadas, como la lista que DistroForge mantiene en su
 
 | fichero TS | líneas | a dónde va | por qué |
 |---|---|---|---|
-| `src/plan.ts` | 215 | `forge-api` (resolver) + núcleo (modelo, ya portado) | convierte config en manifiesto de descargas; con esto `forge generate` funciona de verdad |
 | `src/api/modrinth.ts` | 126 | `forge-api` (la query y la elección) | falta la descarga del `.mrpack` y descomprimir el zip |
 | `src/doctor.ts` | 629 | `forge-cli` (la aritmética ya está en el núcleo) | 16 reglas, boot test y fixes; necesita red, disco y RCON |
 | `src/apply.ts`, `java.ts` | 360 | `forge-cli` | escritura, descargas, JDK |
 | `src/advanced.ts`, `guided.ts`, `index.ts` | 729 | `forge-cli` | la CLI completa |
 
 **El doctor es el trozo grande y el que más valor tiene.** El orden que menos
-sufrimiento da: `plan` → doctor → el resto de la CLI.
+sufrimiento da: doctor → `apply`/`java` → el resto de la CLI.
+
+Con el plan resuelto, `forge plan <cfg>` + `forge dump <cfg> <plan> <dir>` ya
+hacen lo que hace `openblock generate`, que es el camino crítico del producto.
 
 La pauta de `engines` —cada función de red con su parte pura al lado— es la que
 hay que repetir: `paper_builds` hace la petición y `paper_builds_from` mapea la
