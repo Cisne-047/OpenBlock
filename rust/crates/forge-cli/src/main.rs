@@ -18,6 +18,7 @@ mod apply;
 mod bench;
 mod detect;
 mod doctor;
+mod guided;
 mod java;
 mod rcon;
 mod selftest;
@@ -111,6 +112,13 @@ fn main() -> ExitCode {
         Some("generate") => generate_cmd(&args[1..]),
         Some("bench") => bench_cmd(),
         Some("info") => info_cmd(&args[1..]),
+        Some("guided") => match guided::guided() {
+            Ok(()) => ExitCode::SUCCESS,
+            Err(e) => {
+                eprintln!("{e}");
+                ExitCode::FAILURE
+            }
+        },
         Some("help") | Some("--help") | Some("-h") => {
             println!("{HELP}");
             ExitCode::SUCCESS

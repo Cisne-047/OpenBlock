@@ -59,8 +59,9 @@ vigila al otro lado. `forge-api` es el único que hace red, igual que en el TS s
 | `output::zipProject` (el zip portable) | portado y comparado: mismas entradas y mismo contenido |
 | `advanced` (las flags y la config) | portado: flag > config previa > hardware |
 | `hw::bench` (la medida, no solo la fórmula) | portado, con una divergencia que se explica |
-| CLI | `detect`, `bench`, `plan`, `dump`, `install`, `generate`, `info`, `doctor`, `backup`, `stop`, `self-test`, `latest`, `rcon` y `help` |
-| **falta** | el modo guiado (`guided.ts`) |
+| `guided` (el asistente) | portado, salvo la rama del modpack |
+| CLI | `detect`, `bench`, `plan`, `dump`, `install`, `generate`, `info`, `guided`, `doctor`, `backup`, `stop`, `self-test`, `latest`, `rcon` y `help` |
+| **falta** | la rama de modpack del asistente (`fetchMrpack` y el zip de CurseForge) |
 
 **El núcleo generador está completo y con paridad byte a byte**: los 23 ficheros
 del proyecto salen idénticos al TypeScript, `openblock.json` incluido. Los tiers
@@ -314,6 +315,20 @@ el del TS no es una medida de la CPU.
 Se mide con `u64` —que es lo que un benchmark de CPU quiere medir— y queda dicho que
 el número **no es comparable**: lo que `classifyHardware` hace con él está topado a
 10 puntos, así que la clasificación no cambia.
+
+### El asistente, y lo que no se pudo comparar
+
+`forge guided` está portado y probado alimentándolo con respuestas por la entrada
+estándar: recorre las preguntas, construye la config y llega al paso de instalar.
+
+Lo que **no** se pudo hacer es compararlo con el del TS con las mismas respuestas: su
+`readline` no se lleva bien con una entrada por tubería —imprime el hardware y las
+opciones de la primera pregunta y se queda ahí—, así que haría falta una terminal de
+verdad para los dos. Queda dicho como lo que es: probado por un lado, no comparado.
+
+La rama del modpack (Modrinth y CurseForge) no está portada: pide la URL, resuelve el
+`.mrpack` y saca de ahí la versión de MC y el loader. El asistente lo dice y sale, en
+vez de fingir que lo ha hecho.
 
 Lo que la paridad ha cazado, y que ninguna lectura del código habría visto:
 

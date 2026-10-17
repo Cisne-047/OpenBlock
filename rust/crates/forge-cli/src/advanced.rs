@@ -341,6 +341,11 @@ pub fn construir_config(a: &ArgsAvanzados) -> Result<ServerConfig, String> {
 ///
 /// La entropía sale del sistema operativo (`getrandom`), no del reloj: el TS usa
 /// `crypto.randomBytes` y una contraseña de RCON no es sitio para un xorshift.
+/// El mismo generador, para el modo guiado (que lo usa en su config inicial).
+pub fn password_hex_publico() -> String {
+    password_hex()
+}
+
 fn password_hex() -> String {
     let mut bytes = [0u8; 8];
     if getrandom::getrandom(&mut bytes).is_err() {
