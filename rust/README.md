@@ -32,9 +32,11 @@ vigila al otro lado.
 | `generators::scripts` | portado |
 | `generators` (raíz, `generateProject`) | portado |
 | `hw::tiers` | portado |
-| `hw::detect` y `hw::bench` (tocan el sistema) | pendiente, van en el CLI |
+| `hw::detect` | portado, en el CLI (toca el sistema) |
+| `hw::bench` | pendiente |
 | `plan`/`api` (resolver contra las APIs) | pendiente |
-| CLI y doctor | pendiente |
+| doctor | pendiente |
+| CLI | `detect` y `dump` funcionan |
 
 **El núcleo generador está completo y con paridad byte a byte**: los 23 ficheros
 del proyecto salen idénticos al TypeScript, `openblock.json` incluido. Los tiers
@@ -78,6 +80,25 @@ Lo que la paridad ha cazado, y que ninguna lectura del código habría visto:
   template literal de TS (`` `${plan.installer ``) consume un salto, así que la
   salida lleva una línea en blanco de más. Un byte de diferencia en un script que
   el usuario va a ejecutar.
+
+### La detección de hardware es otro tipo de paridad
+
+`hw::detect` no se puede comparar con un golden: el hardware de la máquina de CI
+no es el de nadie. Se compara **en la misma máquina**, que es más fuerte: `forge
+detect --raw-bytes` expone los bytes sin redondear y `tests/detect.test.ts` los
+compara contra `os.totalmem()` y `os.release()` de Node. Solo los valores
+deterministas, porque la RAM y el disco libres cambian entre dos ejecuciones
+seguidas sin que nada esté mal.
+
+Ese test encontró dos fallos reales de redondeo, en direcciones opuestas:
+
+- **RAM total**: el TS hace `Math.round(os.totalmem() / 1048576)` y 34266234880 B
+  son 32678.83 MB, que redondean a **32679**. Yo truncaba y daba 32678, 1 MB de
+  diferencia consistente en cada ejecución.
+- **RAM libre**: lo mismo al revés. Yo redondeaba hacia arriba (`div_ceil`) donde
+  el TS trunca.
+- **`os.release()` en Windows** quita el último componente: `10.0.26300`, no
+  `10.0.26300.0`.
 
 ## Divergencias conocidas
 

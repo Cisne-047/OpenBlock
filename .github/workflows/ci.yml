@@ -7,7 +7,10 @@ on:
 
 jobs:
   cli:
-    # CLI TypeScript: type-check + suite vitest (incluye el doctor end-to-end)
+    # CLI TypeScript: type-check + suite vitest (incluye el doctor end-to-end).
+    # `tests/detect.test.ts` compara la detección de hardware de Rust contra la de
+    # Node **en la misma máquina**, así que necesita el binario compilado: de ahí
+    # el paso del toolchain de Rust en este job.
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -17,8 +20,16 @@ jobs:
         with:
           node-version: 20
           cache: npm
+      - name: Toolchain de Rust (para el test de detección)
+        uses: dtolnay/rust-toolchain@stable
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: rust
       - name: Dependencias
         run: npm ci
+      - name: Compila el CLI de Rust (lo usa tests/detect.test.ts)
+        run: cargo build --manifest-path rust/Cargo.toml
       - name: Tipos
         run: npm run typecheck
       - name: Compila (dist/ es lo que se instala)
