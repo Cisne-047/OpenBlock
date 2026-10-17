@@ -14,26 +14,25 @@ Misma arquitectura que DistroForge: TypeScript ESM + generadores puros (`FileMap
 ## Uso
 
 ```bash
-# Instalar (repo privado: necesitas acceso)
-git clone https://github.com/Cisne-047/OpenBlock.git
-npm install -g ./OpenBlock
-
+npm install -g openblock
 openblock                    # modo guiado (wizard estilo MC)
 ```
-
-`npm install -g ./OpenBlock` compila y deja el comando en el PATH. No se usa
-`npm install -g github:Cisne-047/OpenBlock` porque **npm 12 trae `allow-git`
-desactivado** (`EALLOWGIT`) y esa instalación falla; si lo prefieres, admite
-`--allow-git=all`, pero clonar es una línea y funciona en cualquier versión.
 
 Si trabajas sobre el código, en vez de instalar:
 
 ```bash
+git clone https://github.com/Cisne-047/OpenBlock.git
+cd OpenBlock
 npm install
-npm run openblock            # mismo wizard, sin instalar nada global
-npm link                     # o esto, para tener el comando `openblock` en el PATH
-npm run build                # compila a dist/ (es lo que se instala)
+npm run openblock            # ejecuta el TS directamente, sin compilar
+npm run build                # compila a dist/ (es lo que se publica)
 ```
+
+**Instalar desde el clon no funciona con npm 12.** `npm install -g ./OpenBlock`
+no produce el comando: el clon no trae `dist/` y npm 12 bloquea los scripts de
+instalación (`install-scripts blocked`), así que nada lo compila. Por eso el
+paquete se publica compilado: el tarball ya lleva `dist/`, no necesita `tsx` ni
+compilar en tu máquina. Si vienes del clon, haz `npm run build` antes.
 
 ```bash
 # Modo avanzado: todo por flags, scriptable

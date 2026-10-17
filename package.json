@@ -27,10 +27,9 @@
     "openblock": "tsx src/index.ts",
     "typecheck": "tsc --noEmit",
     "build": "tsc -p tsconfig.build.json",
-    "prepare": "npm run build",
     "test": "vitest run",
     "smoke": "node dist/index.js self-test",
-    "prepublishOnly": "npm run typecheck && npm test"
+    "prepublishOnly": "npm run build && npm run typecheck && npm test"
   },
   "dependencies": {
     "jszip": "^3.10.1"
