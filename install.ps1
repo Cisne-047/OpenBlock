@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     Instala el binario de OpenBlock (Rust) en Windows, desde un Release de GitHub.
 
@@ -16,6 +16,15 @@
 
 .PARAMETER Version
     Versión a instalar (por defecto, la última).
+
+.NOTES
+    Para quien edite este fichero: va en UTF-8 **con BOM**, y el BOM es necesario.
+    Windows PowerShell 5.1 lee los .ps1 sin BOM como ANSI, así que los bytes de
+    `✓`, `↓` y las vocales acentuadas se convierten en comillas tipográficas —que
+    PowerShell acepta como delimitador de cadena— y el script deja de compilar con
+    un error que ni siquiera señala la línea buena. Con BOM lo lee bien, y la ruta
+    documentada (`irm … | iex`, que decodifica por el charset del HTTP) no se entera
+    de que está.
 
 .EXAMPLE
     .\install.ps1

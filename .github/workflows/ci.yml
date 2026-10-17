@@ -75,6 +75,30 @@ jobs:
       - name: Formato
         run: cargo fmt --check
 
+  installers:
+    # Los instaladores también son código, y nadie los ejecutaba. Por ahí se coló
+    # que `install.ps1` se quedara sin BOM: Windows PowerShell 5.1 lee los .ps1 sin
+    # BOM como ANSI, las vocales acentuadas y el ✓ se le vuelven comillas
+    # tipográficas —que acepta como delimitador de cadena— y el script deja de
+    # compilar. Con `pwsh` 7 y con `irm | iex` funcionaba, así que solo se veía al
+    # ejecutarlo desde disco en la PowerShell de serie, que es la que trae Windows.
+    # Aquí se comprueba en los dos sistemas y sin descargar nada.
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: install.sh compila (sh -n)
+        if: runner.os == 'Linux'
+        run: sh -n install.sh
+      - name: install.ps1 compila y dice dónde instalaría
+        if: runner.os == 'Windows'
+        shell: powershell
+        run: .\install.ps1 -DryRun
+
   smoke:
     # Instala un Paper de verdad, lo arranca y lo diagnostica. Es el único job que
     # toca un server real: la suite unitaria nunca arranca uno, y por ahí se coló
