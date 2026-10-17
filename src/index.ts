@@ -1,7 +1,7 @@
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { advanced, backupCommand, buildAdvancedConfig, parseAdvancedArgs, stopCommand } from "./advanced";
-import { dirFrom, parseFlags } from "./cli";
+import { dirFrom, doctorMode, parseFlags } from "./cli";
 import { runBenchmark } from "./hw/bench";
 import { detectHardware } from "./hw/detect";
 import { classifyHardware, recommendedRamMB } from "./hw/tiers";
@@ -105,16 +105,17 @@ async function doctorCmd(rest: string[]): Promise<void> {
   // Linux o WSL): si no existe aquí, el doctor opera sobre --dir
   if (!existsSync(cfg.serverDir)) cfg.serverDir = resolve(dirArg);
   const json = values.json === true;
-  const yes = values.yes === true;
-  const boot = values["no-boot"] !== true;
-  const interactive = !json && !yes && process.stdout.isTTY === true;
+  const mode = doctorMode({
+    json,
+    yes: values.yes === true,
+    boot: values["no-boot"] !== true,
+    tty: process.stdout.isTTY === true,
+  });
   console.log(c.bold(`\n== Doctor: ${cfg.name} (${cfg.engine} ${cfg.mcVersion}) ==`));
   const report = await runDoctor(cfg, {
-    boot,
-    interactive,
-    // Solo el modo interactivo escribe. `--json` (y una tubería o CI) informan y
-    // no tocan nada: el JSON es el contrato que verifica el port a Rust.
-    readOnly: !interactive,
+    boot: mode.boot,
+    interactive: mode.interactive,
+    readOnly: mode.readOnly,
   });
   if (json) {
     console.log(

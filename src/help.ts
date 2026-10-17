@@ -25,7 +25,7 @@ OpenBlock — forja servidores de Minecraft según tu hardware (Windows/Linux)
   openblock doctor [--dir X]     Mini-IA: dry run del server, errores/warnings,
                                  fixes automáticos, pregunta lo considerable
       --no-boot                  análisis estático sin arrancar
-      --yes                      no preguntar (aplica solo lo seguro)
+      --yes                      no preguntar (aplica solo lo seguro, sin terminal)
       --json                     reporte JSON (para scripts/port Rust).
                                  Implica solo lectura: no escribe ni instala nada
   openblock info --dir ./server  Config del server instalado

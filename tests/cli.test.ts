@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { dirFrom, parseFlags } from "../src/cli";
+import { dirFrom, doctorMode, parseFlags } from "../src/cli";
 
 describe("parseFlags", () => {
   const spec = { strings: ["dir", "zip"], booleans: ["json", "yes"] } as const;
@@ -40,5 +40,44 @@ describe("dirFrom", () => {
 
   it("cae al directorio actual cuando no hay --dir", () => {
     expect(dirFrom([])).toBe(".");
+  });
+});
+
+describe("doctorMode", () => {
+  it("--json nunca escribe, ni con terminal", () => {
+    const m = doctorMode({ json: true, tty: true });
+    expect(m.readOnly).toBe(true);
+    expect(m.interactive).toBe(false);
+  });
+
+  it("sin terminal y sin --yes (tubería, CI): informa y no toca nada", () => {
+    const m = doctorMode({ tty: false });
+    expect(m.readOnly).toBe(true);
+    expect(m.interactive).toBe(false);
+  });
+
+  it("--yes escribe lo seguro aunque no haya terminal", () => {
+    // Regresión: la primera versión metía --yes en solo lectura, así que el flag
+    // no hacía nada. Significa "no preguntes, aplica lo seguro": debe escribir.
+    const m = doctorMode({ yes: true, tty: false });
+    expect(m.readOnly).toBe(false);
+    // pero sigue sin preguntar: lo considerable queda pendiente
+    expect(m.interactive).toBe(false);
+  });
+
+  it("con terminal y sin --yes: interactivo y escribe", () => {
+    const m = doctorMode({ tty: true });
+    expect(m.readOnly).toBe(false);
+    expect(m.interactive).toBe(true);
+  });
+
+  it("--json gana sobre --yes: si pides informe, no se escribe", () => {
+    const m = doctorMode({ json: true, yes: true, tty: true });
+    expect(m.readOnly).toBe(true);
+  });
+
+  it("arranca el server salvo que se pase boot:false", () => {
+    expect(doctorMode({ tty: true }).boot).toBe(true);
+    expect(doctorMode({ tty: true, boot: false }).boot).toBe(false);
   });
 });

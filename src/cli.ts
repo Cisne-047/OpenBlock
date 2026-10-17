@@ -67,3 +67,43 @@ export function dirFrom(argv: readonly string[]): string {
   const { values } = parseFlags(argv, { strings: ["dir"] });
   return typeof values.dir === "string" ? values.dir : ".";
 }
+
+export interface DoctorMode {
+  /** informe JSON en stdout: nunca escribe */
+  json: boolean;
+  /** `--yes`: no preguntar, aplicar solo lo seguro */
+  yes: boolean;
+  /** hay terminal interactiva */
+  tty: boolean;
+  /** se arranca el server de verdad (dry run) */
+  boot: boolean;
+  /** se pregunta antes de lo considerable */
+  interactive: boolean;
+  /** no se escribe nada: ni ficheros, ni plugins, ni RCON */
+  readOnly: boolean;
+}
+
+/**
+ * Política de escritura del doctor, en un solo sitio y sin E/S para poder
+ * probarla. Equivocarse aquí es fácil y caro: la primera versión metía `--yes`
+ * en solo lectura y dejaba el flag sin efecto, porque `--yes` significa
+ * exactamente lo contrario ("no preguntes, aplica lo seguro").
+ *
+ * - `--json` es un informe: nunca escribe.
+ * - Sin terminal y sin `--yes` (tubería, CI): informa y no toca nada.
+ * - `--yes` escribe lo seguro aunque no haya terminal.
+ * - Con terminal y sin `--yes`: pregunta antes de lo considerable.
+ */
+export function doctorMode(opts: { json?: boolean; yes?: boolean; boot?: boolean; tty: boolean }): DoctorMode {
+  const json = opts.json === true;
+  const yes = opts.yes === true;
+  const tty = opts.tty;
+  return {
+    json,
+    yes,
+    tty,
+    boot: opts.boot !== false,
+    interactive: !json && !yes && tty,
+    readOnly: json || (!tty && !yes),
+  };
+}
