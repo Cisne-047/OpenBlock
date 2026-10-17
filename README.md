@@ -14,7 +14,7 @@ Misma arquitectura que DistroForge: TypeScript ESM + generadores puros (`FileMap
 ## Uso
 
 ```bash
-# Instalar (el repositorio es privado: necesitas acceso y auth de GitHub)
+# Instalar (repo privado: necesitas acceso y git ya autenticado contra GitHub)
 npm install -g github:Cisne-047/OpenBlock
 
 openblock                    # modo guiado (wizard estilo MC)
