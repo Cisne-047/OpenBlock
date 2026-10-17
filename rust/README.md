@@ -56,7 +56,8 @@ vigila al otro lado. `forge-api` es el único que hace red, igual que en el TS s
 | `apply` (`pregenerate`, `stopServer`, `runBackup`) | portado y probado con un server de verdad |
 | `self-test`: el veredicto | portado, con golden (es lo que decide si un CI pasa) |
 | `self-test`: el ciclo | portado y ejecutado de verdad |
-| CLI | `detect`, `plan`, `dump`, `install`, `doctor`, `backup`, `stop`, `self-test`, `latest` y `rcon` |
+| `output::zipProject` (el zip portable) | portado y comparado: mismas entradas y mismo contenido |
+| CLI | `detect`, `plan`, `dump`, `install`, `generate`, `doctor`, `backup`, `stop`, `self-test`, `latest` y `rcon` |
 
 **El núcleo generador está completo y con paridad byte a byte**: los 23 ficheros
 del proyecto salen idénticos al TypeScript, `openblock.json` incluido. Los tiers
@@ -249,6 +250,26 @@ golden en `tests/golden/selftest.json`: cinco casos, cuatro de ellos malos (no
 arranca, con un finding, aplicó algo en solo lectura, varios fallos a la vez). Un
 verificador del que solo se prueba el «OK» no verifica nada; por eso el veredicto
 está separado de la función que hace E/S, en el núcleo y no en el CLI.
+
+### El zip portable, que no puede ser byte a byte
+
+`forge generate --zip` empaqueta el proyecto para llevarlo a otra máquina, y el zip
+**no puede compararse byte a byte**: JSZip le pone a cada entrada la fecha en que se
+generó, y aquí también. Lo que sí se compara es lo que importa:
+
+```bash
+./node_modules/.bin/tsx src/index.ts generate --config tests/fixtures/parity-config.json --dir /tmp/a --zip /tmp/a.zip
+cargo run -q -p forge-cli -- generate tests/fixtures/parity-config.json --dir /tmp/b --zip /tmp/b.zip --cores 16
+tar -tf /tmp/a.zip | sort > a.txt && tar -tf /tmp/b.zip | sort > b.txt && diff a.txt b.txt
+```
+
+Mismas **23 entradas** y, al extraerlos, mismo contenido fichero a fichero: la única
+diferencia es el `serverDir` dentro de `openblock.json`, que tiene que ser distinto
+porque los dos proyectos están en directorios distintos.
+
+Las entradas van **sin comprimir**, como las del TS: `generateAsync` sin
+`compression` usa `STORE`. Comprimirlas daría un zip más pequeño y ya no sería lo
+que genera el original.
 
 Lo que la paridad ha cazado, y que ninguna lectura del código habría visto:
 

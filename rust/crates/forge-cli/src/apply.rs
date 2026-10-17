@@ -460,6 +460,37 @@ pub fn run_backup(dir: &str) -> Result<(), String> {
     }
 }
 
+// ---------- el zip portable ----------
+
+/// Empaqueta el `FileMap` en un zip (`zipProject`).
+///
+/// Entradas **sin comprimir**, como JSZip por defecto: `generateAsync` sin
+/// `compression` usa `STORE`, así que el zip del TS no comprime nada y aquí se hace
+/// lo mismo. Comprimirlo daría un fichero más pequeño y ya no sería lo que genera el
+/// original.
+///
+/// El zip no puede ser idéntico byte a byte —JSZip le pone a cada entrada la fecha
+/// en que se generó, y aquí también—, pero **el contenido y los nombres de las
+/// entradas sí**: eso es lo que se compara.
+pub fn zip_project(files: &FileMap) -> Result<Vec<u8>, String> {
+    use std::io::Write;
+
+    let mut buf = Vec::new();
+    {
+        let mut zip = zip::ZipWriter::new(std::io::Cursor::new(&mut buf));
+        let opciones = zip::write::SimpleFileOptions::default()
+            .compression_method(zip::CompressionMethod::Stored);
+        for (nombre, contenido) in files {
+            zip.start_file(nombre, opciones)
+                .map_err(|e| format!("{nombre}: {e}"))?;
+            zip.write_all(contenido.as_bytes())
+                .map_err(|e| format!("{nombre}: {e}"))?;
+        }
+        zip.finish().map_err(|e| e.to_string())?;
+    }
+    Ok(buf)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

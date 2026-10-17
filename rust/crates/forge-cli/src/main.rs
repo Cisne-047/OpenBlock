@@ -33,6 +33,9 @@ fn uso() -> ExitCode {
     );
     eprintln!("  dump <config> <plan> <dir> [n]  genera el proyecto desde config y plan");
     eprintln!("  install <config> [--force]      resuelve el plan y baja todo: server instalado");
+    eprintln!(
+        "  generate <config> [--zip Z]     genera el proyecto (y el zip portable si se pide)"
+    );
     eprintln!("  backup <dir>                    ejecuta el script de backup del server");
     eprintln!(
         "  stop <dir>                      apaga el server por RCON (tiene que estar arriba)"
@@ -52,6 +55,7 @@ fn main() -> ExitCode {
         Some("detect") => detect_cmd(&args[1..]),
         Some("dump") => dump_cmd(&args[1..]),
         Some("install") => install_cmd(&args[1..]),
+        Some("generate") => generate_cmd(&args[1..]),
         Some("backup") => backup_cmd(&args[1..]),
         Some("stop") => stop_cmd(&args[1..]),
         Some("self-test") => self_test_cmd(&args[1..]),
@@ -383,6 +387,120 @@ fn install_cmd(args: &[String]) -> ExitCode {
             return ExitCode::FAILURE;
         }
     }
+    ExitCode::SUCCESS
+}
+
+/// `forge generate <config.json> [--dir D] [--zip Z] [--cores N]`.
+///
+/// Resuelve el plan, genera el proyecto y lo escribe. Con `--zip` además lo
+/// empaqueta para llevarlo a otra máquina. Es el `openblock generate` del TS, pero
+/// dirigido por el fichero de config: la superficie de flags del modo avanzado
+/// (`--engine`, `--ram-mb`, `--custom`…) todavía no está portada.
+fn generate_cmd(args: &[String]) -> ExitCode {
+    if args.is_empty() {
+        eprintln!("uso: forge generate <config.json> [--dir D] [--zip salida.zip] [--cores N]");
+        return ExitCode::from(2);
+    }
+    let cfg_txt = match fs::read_to_string(&args[0]) {
+        Ok(t) => t,
+        Err(e) => {
+            eprintln!("No se pudo leer {}: {e}", args[0]);
+            return ExitCode::FAILURE;
+        }
+    };
+    let mut cfg: forge_core::ServerConfig = match serde_json::from_str(&cfg_txt) {
+        Ok(c) => c,
+        Err(e) => {
+            eprintln!("{} no es una config válida: {e}", args[0]);
+            return ExitCode::FAILURE;
+        }
+    };
+    let mut dir: Option<String> = None;
+    let mut zip_salida: Option<String> = None;
+    let mut cores = num_cpus();
+    let mut i = 1;
+    while i < args.len() {
+        match args[i].as_str() {
+            "--dir" => {
+                i += 1;
+                dir = args.get(i).cloned();
+                if dir.is_none() {
+                    eprintln!("--dir necesita un directorio");
+                    return ExitCode::from(2);
+                }
+            }
+            "--zip" => {
+                i += 1;
+                zip_salida = args.get(i).cloned();
+                if zip_salida.is_none() {
+                    eprintln!("--zip necesita un fichero de salida");
+                    return ExitCode::from(2);
+                }
+            }
+            "--cores" => {
+                i += 1;
+                match args.get(i).and_then(|c| c.parse::<u32>().ok()) {
+                    Some(c) => cores = c,
+                    None => {
+                        eprintln!("--cores necesita un número");
+                        return ExitCode::from(2);
+                    }
+                }
+            }
+            otro => {
+                eprintln!("opción desconocida para generate: {otro}");
+                return ExitCode::from(2);
+            }
+        }
+        i += 1;
+    }
+    if let Some(d) = dir {
+        cfg.server_dir = d;
+    }
+
+    let (plan, avisos) = match forge_api::plan::build_download_plan(&cfg) {
+        Ok(p) => p,
+        Err(e) => {
+            eprintln!("No se pudo resolver el plan: {e}");
+            return ExitCode::FAILURE;
+        }
+    };
+    println!("== Plan == {}", plan.engine_resolved);
+    for e in &plan.entries {
+        println!("  [{}] {}", e.kind.as_str(), e.label);
+    }
+    for a in &avisos {
+        eprintln!("{}", a.0);
+    }
+
+    let files = forge_core::generators::generate_project(&cfg, &plan, cores);
+    let destino = resolver(&cfg.server_dir);
+    if let Err(e) = apply::write_project(&destino, &files) {
+        eprintln!("No se pudo escribir en {}: {e}", destino.display());
+        return ExitCode::FAILURE;
+    }
+    println!(
+        "✓ Proyecto generado en {} ({} ficheros)",
+        destino.display(),
+        files.len()
+    );
+
+    if let Some(z) = zip_salida {
+        let bytes = match apply::zip_project(&files) {
+            Ok(b) => b,
+            Err(e) => {
+                eprintln!("No se pudo empaquetar: {e}");
+                return ExitCode::FAILURE;
+            }
+        };
+        let ruta_zip = resolver(&z);
+        if let Err(e) = fs::write(&ruta_zip, bytes) {
+            eprintln!("No se pudo escribir {}: {e}", ruta_zip.display());
+            return ExitCode::FAILURE;
+        }
+        println!("✓ Zip portable: {}", ruta_zip.display());
+    }
+    println!("En otra máquina: ./install.sh (Linux) o install.ps1 (Windows) y luego start.");
     ExitCode::SUCCESS
 }
 
