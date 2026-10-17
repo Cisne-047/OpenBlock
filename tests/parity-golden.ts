@@ -19,8 +19,9 @@ import { bukkitYml, paperGlobalYml, paperWorldDefaultsYml, spigotYml } from "../
 import { backupPs1, backupSh, backupTimer, firewallPs1, firewallSh } from "../src/generators/ops.js";
 import { installServicePs1, installServiceSh, removeServicePs1, systemdUnit, winswConfig } from "../src/generators/service.js";
 import { ENGINES, PERF_ITEMS, javaMajorFor, parseMc, perfItemsFor } from "../src/catalog.js";
+import { TIERS, classifyHardware, recommendedGc, recommendedRamMB } from "../src/hw/tiers.js";
 import { planFor } from "./helpers.js";
-import type { ServerConfig } from "../src/types.js";
+import type { HardwareProfile, ServerConfig } from "../src/types.js";
 
 const raiz = join(fileURLToPath(new URL(".", import.meta.url)), "..");
 const golden = join(raiz, "rust", "crates", "forge-core", "tests", "golden");
@@ -131,5 +132,65 @@ const catalogo = {
 };
 writeFileSync(join(golden, "catalog.json"), JSON.stringify(catalogo, null, 2) + "\n", "utf8");
 
-console.log(`golden: ${Object.keys(sueltos).length} generadores de hoja + ${Object.keys(proyecto).length} ficheros de proyecto + catálogo`);
+// Tiers: la tabla y la clasificación de perfiles variados. Los casos límite son
+// donde una resta o un redondeo distinto cambia el tier, así que se cubren RAM
+// justa, cores justos, disco lento, VM y benchmark.
+const hwBase: HardwareProfile = {
+  os: "linux",
+  osVersion: "6.8",
+  arch: "x64",
+  hostname: "test",
+  cpuModel: "Test CPU",
+  cores: 8,
+  ramTotalMB: 16384,
+  ramFreeMB: 8192,
+  swapTotalMB: 0,
+  diskKind: "nvme",
+  diskFreeMB: 50000,
+  virtualized: false,
+};
+
+const perfiles: Array<[string, Partial<HardwareProfile>]> = [
+  ["base nvme 8c/16GB", {}],
+  ["ram justa 2GB", { ramTotalMB: 2048 }],
+  ["ram 4GB", { ramTotalMB: 4096 }],
+  ["un solo core", { cores: 1 }],
+  ["dos cores", { cores: 2 }],
+  ["hdd 12c/32GB", { diskKind: "hdd", ramTotalMB: 32768, cores: 12 }],
+  ["ssd 8c/16GB", { diskKind: "ssd" }],
+  ["disco desconocido", { diskKind: "unknown" }],
+  ["vm penalizada", { virtualized: true }],
+  ["vm con pepino", { virtualized: true, cores: 24, ramTotalMB: 65536 }],
+  ["pepino 24c/64GB", { cores: 24, ramTotalMB: 65536 }],
+  ["sin bench vs bench alto", { diskKind: "hdd", bench: { cpuScore: 9000, diskMBs: 500, durationMs: 1000 } }],
+  ["bench justo en el borde", { cores: 8, ramTotalMB: 16384, bench: { cpuScore: 7000, diskMBs: 400, durationMs: 900 } }],
+  ["bench a cero", { bench: { cpuScore: 0, diskMBs: 0, durationMs: 0 } }],
+  ["32GB compartida vs dedicada", { ramTotalMB: 32768 }],
+  ["64GB", { ramTotalMB: 65536, cores: 16 }],
+  ["128GB muchos cores", { ramTotalMB: 131072, cores: 32 }],
+  ["1GB de ram", { ramTotalMB: 1024 }],
+  ["3 cores", { cores: 3 }],
+  ["7 cores (borde de zgc)", { cores: 7, ramTotalMB: 16384 }],
+  ["8 cores con 15GB (borde de zgc)", { cores: 8, ramTotalMB: 15360 }],
+];
+
+const tiersGolden = {
+  tiers: Object.values(TIERS).map((t) => ({ ...t })),
+  casos: perfiles.map(([nombre, over]) => {
+    const h: HardwareProfile = { ...hwBase, ...over };
+    return {
+      nombre,
+      hw: h,
+      tier: classifyHardware(h).id,
+      ramDedicada: recommendedRamMB(h, true),
+      ramCompartida: recommendedRamMB(h, false),
+      gc: recommendedGc(h),
+    };
+  }),
+};
+writeFileSync(join(golden, "tiers.json"), JSON.stringify(tiersGolden, null, 2) + "\n", "utf8");
+
+console.log(
+  `golden: ${Object.keys(sueltos).length} generadores de hoja + ${Object.keys(proyecto).length} ficheros de proyecto + catálogo + ${tiersGolden.casos.length} perfiles de hardware`
+);
 console.log(`en ${golden}`);

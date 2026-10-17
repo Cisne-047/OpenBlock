@@ -352,18 +352,21 @@ pub struct HardwareProfile {
 }
 
 /// Tier de hardware (`Tier`).
+///
+/// `label` y `gc` son `&'static str` para que `TIERS` sea `const` sin
+/// `LazyLock`: la tabla es una constante, igual que `ENGINES` y `PERF_ITEMS`.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Tier {
     pub id: TierId,
-    pub label: String,
+    pub label: &'static str,
     pub max_players: u32,
     pub view_distance: u32,
     pub simulation_distance: u32,
     pub pregen_radius: u32,
     pub recommended_engine: EngineId,
     /// "g1" o "zgc".
-    pub gc: String,
+    pub gc: &'static str,
     /// % de RAM total que conviene asignar si el server está dedicado.
     pub dedicated_ram_pct: f64,
 }

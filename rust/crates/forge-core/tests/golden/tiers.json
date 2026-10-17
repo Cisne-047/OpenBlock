@@ -1,0 +1,517 @@
+{
+  "tiers": [
+    {
+      "id": "potato",
+      "label": "Patata",
+      "maxPlayers": 5,
+      "viewDistance": 4,
+      "simulationDistance": 4,
+      "pregenRadius": 0,
+      "recommendedEngine": "paper",
+      "gc": "g1",
+      "dedicatedRamPct": 0.6
+    },
+    {
+      "id": "low",
+      "label": "Bajo",
+      "maxPlayers": 10,
+      "viewDistance": 6,
+      "simulationDistance": 5,
+      "pregenRadius": 2000,
+      "recommendedEngine": "paper",
+      "gc": "g1",
+      "dedicatedRamPct": 0.65
+    },
+    {
+      "id": "mid",
+      "label": "Medio",
+      "maxPlayers": 20,
+      "viewDistance": 8,
+      "simulationDistance": 6,
+      "pregenRadius": 4000,
+      "recommendedEngine": "purpur",
+      "gc": "g1",
+      "dedicatedRamPct": 0.7
+    },
+    {
+      "id": "high",
+      "label": "Alto",
+      "maxPlayers": 40,
+      "viewDistance": 10,
+      "simulationDistance": 8,
+      "pregenRadius": 6000,
+      "recommendedEngine": "purpur",
+      "gc": "g1",
+      "dedicatedRamPct": 0.75
+    },
+    {
+      "id": "enthusiast",
+      "label": "Entusiasta",
+      "maxPlayers": 60,
+      "viewDistance": 12,
+      "simulationDistance": 10,
+      "pregenRadius": 10000,
+      "recommendedEngine": "folia",
+      "gc": "zgc",
+      "dedicatedRamPct": 0.8
+    }
+  ],
+  "casos": [
+    {
+      "nombre": "base nvme 8c/16GB",
+      "hw": {
+        "os": "linux",
+        "osVersion": "6.8",
+        "arch": "x64",
+        "hostname": "test",
+        "cpuModel": "Test CPU",
+        "cores": 8,
+        "ramTotalMB": 16384,
+        "ramFreeMB": 8192,
+        "swapTotalMB": 0,
+        "diskKind": "nvme",
+        "diskFreeMB": 50000,
+        "virtualized": false
+      },
+      "tier": "high",
+      "ramDedicada": 12288,
+      "ramCompartida": 7168,
+      "gc": "zgc"
+    },
+    {
+      "nombre": "ram justa 2GB",
+      "hw": {
+        "os": "linux",
+        "osVersion": "6.8",
+        "arch": "x64",
+        "hostname": "test",
+        "cpuModel": "Test CPU",
+        "cores": 8,
+        "ramTotalMB": 2048,
+        "ramFreeMB": 8192,
+        "swapTotalMB": 0,
+        "diskKind": "nvme",
+        "diskFreeMB": 50000,
+        "virtualized": false
+      },
+      "tier": "potato",
+      "ramDedicada": 1024,
+      "ramCompartida": 1024,
+      "gc": "g1"
+    },
+    {
+      "nombre": "ram 4GB",
+      "hw": {
+        "os": "linux",
+        "osVersion": "6.8",
+        "arch": "x64",
+        "hostname": "test",
+        "cpuModel": "Test CPU",
+        "cores": 8,
+        "ramTotalMB": 4096,
+        "ramFreeMB": 8192,
+        "swapTotalMB": 0,
+        "diskKind": "nvme",
+        "diskFreeMB": 50000,
+        "virtualized": false
+      },
+      "tier": "mid",
+      "ramDedicada": 2560,
+      "ramCompartida": 2048,
+      "gc": "g1"
+    },
+    {
+      "nombre": "un solo core",
+      "hw": {
+        "os": "linux",
+        "osVersion": "6.8",
+        "arch": "x64",
+        "hostname": "test",
+        "cpuModel": "Test CPU",
+        "cores": 1,
+        "ramTotalMB": 16384,
+        "ramFreeMB": 8192,
+        "swapTotalMB": 0,
+        "diskKind": "nvme",
+        "diskFreeMB": 50000,
+        "virtualized": false
+      },
+      "tier": "potato",
+      "ramDedicada": 9728,
+      "ramCompartida": 7168,
+      "gc": "g1"
+    },
+    {
+      "nombre": "dos cores",
+      "hw": {
+        "os": "linux",
+        "osVersion": "6.8",
+        "arch": "x64",
+        "hostname": "test",
+        "cpuModel": "Test CPU",
+        "cores": 2,
+        "ramTotalMB": 16384,
+        "ramFreeMB": 8192,
+        "swapTotalMB": 0,
+        "diskKind": "nvme",
+        "diskFreeMB": 50000,
+        "virtualized": false
+      },
+      "tier": "mid",
+      "ramDedicada": 11264,
+      "ramCompartida": 7168,
+      "gc": "g1"
+    },
+    {
+      "nombre": "hdd 12c/32GB",
+      "hw": {
+        "os": "linux",
+        "osVersion": "6.8",
+        "arch": "x64",
+        "hostname": "test",
+        "cpuModel": "Test CPU",
+        "cores": 12,
+        "ramTotalMB": 32768,
+        "ramFreeMB": 8192,
+        "swapTotalMB": 0,
+        "diskKind": "hdd",
+        "diskFreeMB": 50000,
+        "virtualized": false
+      },
+      "tier": "high",
+      "ramDedicada": 24576,
+      "ramCompartida": 14848,
+      "gc": "zgc"
+    },
+    {
+      "nombre": "ssd 8c/16GB",
+      "hw": {
+        "os": "linux",
+        "osVersion": "6.8",
+        "arch": "x64",
+        "hostname": "test",
+        "cpuModel": "Test CPU",
+        "cores": 8,
+        "ramTotalMB": 16384,
+        "ramFreeMB": 8192,
+        "swapTotalMB": 0,
+        "diskKind": "ssd",
+        "diskFreeMB": 50000,
+        "virtualized": false
+      },
+      "tier": "high",
+      "ramDedicada": 12288,
+      "ramCompartida": 7168,
+      "gc": "zgc"
+    },
+    {
+      "nombre": "disco desconocido",
+      "hw": {
+        "os": "linux",
+        "osVersion": "6.8",
+        "arch": "x64",
+        "hostname": "test",
+        "cpuModel": "Test CPU",
+        "cores": 8,
+        "ramTotalMB": 16384,
+        "ramFreeMB": 8192,
+        "swapTotalMB": 0,
+        "diskKind": "unknown",
+        "diskFreeMB": 50000,
+        "virtualized": false
+      },
+      "tier": "high",
+      "ramDedicada": 12288,
+      "ramCompartida": 7168,
+      "gc": "zgc"
+    },
+    {
+      "nombre": "vm penalizada",
+      "hw": {
+        "os": "linux",
+        "osVersion": "6.8",
+        "arch": "x64",
+        "hostname": "test",
+        "cpuModel": "Test CPU",
+        "cores": 8,
+        "ramTotalMB": 16384,
+        "ramFreeMB": 8192,
+        "swapTotalMB": 0,
+        "diskKind": "nvme",
+        "diskFreeMB": 50000,
+        "virtualized": true
+      },
+      "tier": "high",
+      "ramDedicada": 12288,
+      "ramCompartida": 7168,
+      "gc": "zgc"
+    },
+    {
+      "nombre": "vm con pepino",
+      "hw": {
+        "os": "linux",
+        "osVersion": "6.8",
+        "arch": "x64",
+        "hostname": "test",
+        "cpuModel": "Test CPU",
+        "cores": 24,
+        "ramTotalMB": 65536,
+        "ramFreeMB": 8192,
+        "swapTotalMB": 0,
+        "diskKind": "nvme",
+        "diskFreeMB": 50000,
+        "virtualized": true
+      },
+      "tier": "enthusiast",
+      "ramDedicada": 52224,
+      "ramCompartida": 29696,
+      "gc": "zgc"
+    },
+    {
+      "nombre": "pepino 24c/64GB",
+      "hw": {
+        "os": "linux",
+        "osVersion": "6.8",
+        "arch": "x64",
+        "hostname": "test",
+        "cpuModel": "Test CPU",
+        "cores": 24,
+        "ramTotalMB": 65536,
+        "ramFreeMB": 8192,
+        "swapTotalMB": 0,
+        "diskKind": "nvme",
+        "diskFreeMB": 50000,
+        "virtualized": false
+      },
+      "tier": "enthusiast",
+      "ramDedicada": 52224,
+      "ramCompartida": 29696,
+      "gc": "zgc"
+    },
+    {
+      "nombre": "sin bench vs bench alto",
+      "hw": {
+        "os": "linux",
+        "osVersion": "6.8",
+        "arch": "x64",
+        "hostname": "test",
+        "cpuModel": "Test CPU",
+        "cores": 8,
+        "ramTotalMB": 16384,
+        "ramFreeMB": 8192,
+        "swapTotalMB": 0,
+        "diskKind": "hdd",
+        "diskFreeMB": 50000,
+        "virtualized": false,
+        "bench": {
+          "cpuScore": 9000,
+          "diskMBs": 500,
+          "durationMs": 1000
+        }
+      },
+      "tier": "high",
+      "ramDedicada": 12288,
+      "ramCompartida": 7168,
+      "gc": "zgc"
+    },
+    {
+      "nombre": "bench justo en el borde",
+      "hw": {
+        "os": "linux",
+        "osVersion": "6.8",
+        "arch": "x64",
+        "hostname": "test",
+        "cpuModel": "Test CPU",
+        "cores": 8,
+        "ramTotalMB": 16384,
+        "ramFreeMB": 8192,
+        "swapTotalMB": 0,
+        "diskKind": "nvme",
+        "diskFreeMB": 50000,
+        "virtualized": false,
+        "bench": {
+          "cpuScore": 7000,
+          "diskMBs": 400,
+          "durationMs": 900
+        }
+      },
+      "tier": "enthusiast",
+      "ramDedicada": 13312,
+      "ramCompartida": 7168,
+      "gc": "zgc"
+    },
+    {
+      "nombre": "bench a cero",
+      "hw": {
+        "os": "linux",
+        "osVersion": "6.8",
+        "arch": "x64",
+        "hostname": "test",
+        "cpuModel": "Test CPU",
+        "cores": 8,
+        "ramTotalMB": 16384,
+        "ramFreeMB": 8192,
+        "swapTotalMB": 0,
+        "diskKind": "nvme",
+        "diskFreeMB": 50000,
+        "virtualized": false,
+        "bench": {
+          "cpuScore": 0,
+          "diskMBs": 0,
+          "durationMs": 0
+        }
+      },
+      "tier": "high",
+      "ramDedicada": 12288,
+      "ramCompartida": 7168,
+      "gc": "zgc"
+    },
+    {
+      "nombre": "32GB compartida vs dedicada",
+      "hw": {
+        "os": "linux",
+        "osVersion": "6.8",
+        "arch": "x64",
+        "hostname": "test",
+        "cpuModel": "Test CPU",
+        "cores": 8,
+        "ramTotalMB": 32768,
+        "ramFreeMB": 8192,
+        "swapTotalMB": 0,
+        "diskKind": "nvme",
+        "diskFreeMB": 50000,
+        "virtualized": false
+      },
+      "tier": "high",
+      "ramDedicada": 24576,
+      "ramCompartida": 14848,
+      "gc": "zgc"
+    },
+    {
+      "nombre": "64GB",
+      "hw": {
+        "os": "linux",
+        "osVersion": "6.8",
+        "arch": "x64",
+        "hostname": "test",
+        "cpuModel": "Test CPU",
+        "cores": 16,
+        "ramTotalMB": 65536,
+        "ramFreeMB": 8192,
+        "swapTotalMB": 0,
+        "diskKind": "nvme",
+        "diskFreeMB": 50000,
+        "virtualized": false
+      },
+      "tier": "enthusiast",
+      "ramDedicada": 52224,
+      "ramCompartida": 29696,
+      "gc": "zgc"
+    },
+    {
+      "nombre": "128GB muchos cores",
+      "hw": {
+        "os": "linux",
+        "osVersion": "6.8",
+        "arch": "x64",
+        "hostname": "test",
+        "cpuModel": "Test CPU",
+        "cores": 32,
+        "ramTotalMB": 131072,
+        "ramFreeMB": 8192,
+        "swapTotalMB": 0,
+        "diskKind": "nvme",
+        "diskFreeMB": 50000,
+        "virtualized": false
+      },
+      "tier": "enthusiast",
+      "ramDedicada": 104960,
+      "ramCompartida": 58880,
+      "gc": "zgc"
+    },
+    {
+      "nombre": "1GB de ram",
+      "hw": {
+        "os": "linux",
+        "osVersion": "6.8",
+        "arch": "x64",
+        "hostname": "test",
+        "cpuModel": "Test CPU",
+        "cores": 8,
+        "ramTotalMB": 1024,
+        "ramFreeMB": 8192,
+        "swapTotalMB": 0,
+        "diskKind": "nvme",
+        "diskFreeMB": 50000,
+        "virtualized": false
+      },
+      "tier": "potato",
+      "ramDedicada": 512,
+      "ramCompartida": 512,
+      "gc": "g1"
+    },
+    {
+      "nombre": "3 cores",
+      "hw": {
+        "os": "linux",
+        "osVersion": "6.8",
+        "arch": "x64",
+        "hostname": "test",
+        "cpuModel": "Test CPU",
+        "cores": 3,
+        "ramTotalMB": 16384,
+        "ramFreeMB": 8192,
+        "swapTotalMB": 0,
+        "diskKind": "nvme",
+        "diskFreeMB": 50000,
+        "virtualized": false
+      },
+      "tier": "high",
+      "ramDedicada": 12288,
+      "ramCompartida": 7168,
+      "gc": "g1"
+    },
+    {
+      "nombre": "7 cores (borde de zgc)",
+      "hw": {
+        "os": "linux",
+        "osVersion": "6.8",
+        "arch": "x64",
+        "hostname": "test",
+        "cpuModel": "Test CPU",
+        "cores": 7,
+        "ramTotalMB": 16384,
+        "ramFreeMB": 8192,
+        "swapTotalMB": 0,
+        "diskKind": "nvme",
+        "diskFreeMB": 50000,
+        "virtualized": false
+      },
+      "tier": "high",
+      "ramDedicada": 12288,
+      "ramCompartida": 7168,
+      "gc": "g1"
+    },
+    {
+      "nombre": "8 cores con 15GB (borde de zgc)",
+      "hw": {
+        "os": "linux",
+        "osVersion": "6.8",
+        "arch": "x64",
+        "hostname": "test",
+        "cpuModel": "Test CPU",
+        "cores": 8,
+        "ramTotalMB": 15360,
+        "ramFreeMB": 8192,
+        "swapTotalMB": 0,
+        "diskKind": "nvme",
+        "diskFreeMB": 50000,
+        "virtualized": false
+      },
+      "tier": "high",
+      "ramDedicada": 11776,
+      "ramCompartida": 7168,
+      "gc": "g1"
+    }
+  ]
+}

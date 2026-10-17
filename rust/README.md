@@ -31,13 +31,14 @@ vigila al otro lado.
 | `plan` (modelo) | portado |
 | `generators::scripts` | portado |
 | `generators` (raíz, `generateProject`) | portado |
-| `hw` (detección y tiers) | pendiente |
+| `hw::tiers` | portado |
+| `hw::detect` y `hw::bench` (tocan el sistema) | pendiente, van en el CLI |
 | `plan`/`api` (resolver contra las APIs) | pendiente |
 | CLI y doctor | pendiente |
 
 **El núcleo generador está completo y con paridad byte a byte**: los 23 ficheros
-del proyecto salen idénticos al TypeScript, `openblock.json` incluido.
-
+del proyecto salen idénticos al TypeScript, `openblock.json` incluido. Los tiers
+también, con 21 perfiles de hardware comparados contra el TS.
 ## Paridad
 
 El núcleo Rust se compara **byte a byte** contra el TypeScript. El golden lo
