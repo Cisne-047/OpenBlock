@@ -58,7 +58,7 @@ import { evaluateSelfTest } from "../src/selftest.js";
 import { evaluateLogRules, evaluateStaticRules, LOG_RULES, rewriteHeapFlags } from "../src/doctor.js";
 import type { DoctorContext, Finding } from "../src/doctor.js";import type { HardwareProfile, ServerConfig } from "../src/types.js";
 
-const raiz = join(fileURLToPath(new URL(".", import.meta.url)), "..");
+const raiz = join(fileURLToPath(new URL(".", import.meta.url)), "..", "..");
 const golden = join(raiz, "rust", "crates", "forge-core", "tests", "golden");
 const goldenApi = join(raiz, "rust", "crates", "forge-api", "tests", "golden");
 

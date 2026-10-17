@@ -26,7 +26,8 @@ import os from "node:os";
  * PowerShell varias veces y cada arranque cuesta segundos.
  */
 
-const RAIZ = join(fileURLToPath(new URL(".", import.meta.url)), "..");
+// la raíz del repo: este test vive en legacy/tests y el binario de Rust en rust/
+const RAIZ = join(fileURLToPath(new URL(".", import.meta.url)), "..", "..");
 const BIN = join(RAIZ, "rust", "target", "debug", process.platform === "win32" ? "forge.exe" : "forge");
 
 interface BytesCrudos {

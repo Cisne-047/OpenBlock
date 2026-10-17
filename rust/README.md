@@ -511,13 +511,18 @@ Minecraft no llevan comodines y el regex acierta. El puerto no puede apoyarse en
 eso, porque el día que el orden cambie, el TS elegirá una build vieja y el puerto
 tiene que elegir la misma.
 
-### Qué NO mover a `legacy/`
+### El TS está en `legacy/`, y sigue siendo el espejo
 
-El objetivo hablaba de dejar el TS en `legacy/`, como hizo DistroForge. **Aquí no
-procede todavía**: el TS sigue siendo la implementación que está publicada en npm y
-la referencia contra la que se verifica la paridad. Moverlo ahora rompería el
-golden, el CI y la publicación a la vez. Se moverá cuando el Rust sea el que se
-distribuye, y entonces sí tendrá sentido.
+El TypeScript se movió a `legacy/` cuando el port cubrió la CLI entera. **No se
+borró ni se congeló**: el golden lo sigue generando él (`npm run parity:golden`,
+que ahora vive en `legacy/tests/parity-golden.ts` con el tooling en la raíz), así que
+cada byte que produce el Rust se sigue comparando contra el original.
+
+Lo que cambió: el producto es el binario de `rust/`, el paquete de npm quedó
+congelado en v0.1.0 (`legacy/package.json` es privado) y la distribución del binario
+—cómo se instala `forge` en una máquina sin Rust— es lo que falta por decidir.
+
+## Por qué Rust
 ## Por qué Rust
 
 No arregla el reparto —ese problema ya está resuelto publicando en npm, y

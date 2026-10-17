@@ -24,12 +24,12 @@
     "access": "public"
   },
   "scripts": {
-    "openblock": "tsx src/index.ts",
+    "openblock": "tsx legacy/src/index.ts",
     "typecheck": "tsc --noEmit",
     "build": "tsc -p tsconfig.build.json",
     "test": "vitest run",
-    "smoke": "npm run build && node dist/index.js self-test",
-    "parity:golden": "tsx tests/parity-golden.ts",
+    "smoke": "npm run build && node legacy/dist/index.js self-test",
+    "parity:golden": "tsx legacy/tests/parity-golden.ts",
     "parity": "npm run parity:golden && cargo test --manifest-path rust/Cargo.toml",
     "prepublishOnly": "npm run build && npm run typecheck && npm test"
   },
@@ -41,5 +41,6 @@
     "tsx": "^4.19.0",
     "typescript": "~5.6.2",
     "vitest": "^2.1.9"
-  }
+  },
+  "private": true
 }

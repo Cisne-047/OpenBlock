@@ -2,10 +2,14 @@
 
 **Forja servidores de Minecraft según tu hardware.** Hermano de [DistroForge](https://github.com/cisne-047/DistroForge) (que forja distros Linux): OpenBlock forja servidores de MC.
 
-- **Requiere**: Node.js 20 o superior, en Windows o Linux. Java se gestiona solo (OpenBlock se descarga el JDK que pida la versión de MC), aunque para el `self-test` conviene tener uno a mano
+> **Dónde está cada cosa.** El **producto es el binario de Rust** de [`rust/`](rust/README.md): ahí están el plan, el generador, el doctor y toda la CLI (`forge`). El **TypeScript vive en [`legacy/`](legacy/)** como referencia y **espejo de paridad**: el golden lo sigue generando él, así que cada byte de lo que produce el Rust se sigue comparando contra el original. El paquete de npm quedó **congelado en v0.1.0** (`legacy/package.json` es privado): la distribución del binario es el siguiente paso y está anotada en [`rust/README.md`](rust/README.md).
+>
+> Lo de abajo describe el comportamiento del CLI, que es el mismo en los dos: `forge <comando>` en Rust, `openblock <comando>` en el TypeScript de `legacy/`.
+
+- **Requiere**: el binario (no necesita Node). El TypeScript de `legacy/`, si quieres usarlo, pide Node.js 20 o superior. Java se gestiona solo (OpenBlock se descarga el JDK que pida la versión de MC), aunque para el `self-test` conviene tener uno a mano
 - **Historial de cambios**: [CHANGELOG.md](CHANGELOG.md)
 - **Licencia**: MIT para el código; el banner y el nombre quedan fuera ([LICENSE](LICENSE))
-- **Estado**: v0.1.0 sin etiquetar, en desarrollo — el repositorio es privado por ahora
+- **Estado**: v0.1.0 publicada en npm (TypeScript); el port a Rust está completo y verificado
 
 Detecta tu máquina (Windows/Linux), elige engine, build exacta, RAM, GC, distancias y plugins/mods de rendimiento, instala todo y **deja el server arrancable con un script**. Y cuando está listo, el **Doctor** hace un dry run: cuenta errores y warnings, arregla lo seguro y te pregunta antes de tocar nada considerable.
 
