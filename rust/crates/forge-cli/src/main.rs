@@ -18,6 +18,7 @@ mod detect;
 mod doctor;
 mod java;
 mod rcon;
+mod selftest;
 
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -36,6 +37,9 @@ fn uso() -> ExitCode {
     eprintln!(
         "  stop <dir>                      apaga el server por RCON (tiene que estar arriba)"
     );
+    eprintln!(
+        "  self-test [--mc X] [--port N]   instala, arranca y diagnostica (es el smoke de CI)"
+    );
     eprintln!("  doctor [--dir D] [--json]       diagnostica un server instalado (solo lectura)");
     eprintln!("  latest                          última release de Minecraft (consulta Mojang)");
     eprintln!("  rcon <host> <puerto> <comando>  manda un comando por RCON (pass: OPENBLOCK_RCON_PASSWORD)");
@@ -50,6 +54,7 @@ fn main() -> ExitCode {
         Some("install") => install_cmd(&args[1..]),
         Some("backup") => backup_cmd(&args[1..]),
         Some("stop") => stop_cmd(&args[1..]),
+        Some("self-test") => self_test_cmd(&args[1..]),
         Some("latest") => latest_cmd(),
         Some("doctor") => doctor_cmd(&args[1..]),
         Some("plan") => plan_cmd(&args[1..]),
@@ -379,6 +384,50 @@ fn install_cmd(args: &[String]) -> ExitCode {
         }
     }
     ExitCode::SUCCESS
+}
+
+/// `forge self-test [--mc X] [--port N] [--keep]` — instala, arranca y diagnostica.
+///
+/// Es el mismo smoke test que corre el CI del TS: si sale 0, el ciclo entero
+/// funciona. Instala en un directorio temporal y lo borra al terminar (`--keep` lo
+/// conserva para mirarlo).
+fn self_test_cmd(args: &[String]) -> ExitCode {
+    let mut opts = selftest::OpcionesSelfTest {
+        cores: num_cpus(),
+        ..Default::default()
+    };
+    let mut i = 0;
+    while i < args.len() {
+        match args[i].as_str() {
+            "--keep" => opts.keep = true,
+            "--mc" => {
+                i += 1;
+                match args.get(i) {
+                    Some(mc) => opts.mc = Some(mc.clone()),
+                    None => {
+                        eprintln!("--mc necesita una versión");
+                        return ExitCode::from(2);
+                    }
+                }
+            }
+            "--port" => {
+                i += 1;
+                match args.get(i).and_then(|p| p.parse::<u16>().ok()) {
+                    Some(p) => opts.port = Some(p),
+                    None => {
+                        eprintln!("--port necesita un número");
+                        return ExitCode::from(2);
+                    }
+                }
+            }
+            otro => {
+                eprintln!("opción desconocida para self-test: {otro}");
+                return ExitCode::from(2);
+            }
+        }
+        i += 1;
+    }
+    ExitCode::from(selftest::run_self_test(&opts) as u8)
 }
 
 /// `forge backup <dir>` — ejecuta el script de backup del server.

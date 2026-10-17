@@ -54,7 +54,9 @@ vigila al otro lado. `forge-api` es el único que hace red, igual que en el TS s
 | `java::ensureJava` (JDK del sistema o Temurin) | portado; ver la nota de abajo |
 | `apply` (`install`: proyecto + java + descargas + installer) | portado y comparado con el TS |
 | `apply` (`pregenerate`, `stopServer`, `runBackup`) | portado y probado con un server de verdad |
-| CLI | `detect`, `plan`, `dump`, `install`, `doctor`, `backup`, `stop`, `latest` y `rcon` |
+| `self-test`: el veredicto | portado, con golden (es lo que decide si un CI pasa) |
+| `self-test`: el ciclo | portado y ejecutado de verdad |
+| CLI | `detect`, `plan`, `dump`, `install`, `doctor`, `backup`, `stop`, `self-test`, `latest` y `rcon` |
 
 **El núcleo generador está completo y con paridad byte a byte**: los 23 ficheros
 del proyecto salen idénticos al TypeScript, `openblock.json` incluido. Los tiers
@@ -225,6 +227,28 @@ camino de error, no el backup en sí.
 
 Y `extractCfOverrides` **no** se portó: el TS la exporta y no la llama nadie, igual
 que `javaBinDir`.
+
+### El self-test, que es la prueba de todo lo demás
+
+`forge self-test` es el smoke test del CI del TS llevado al Rust: instala un Paper
+en un directorio temporal, lo arranca de verdad, lo diagnostica en solo lectura y
+decide. Ejecutado en esta máquina:
+
+```
+  ✓ instalación — Paper 1.20.4, 16 hilos
+  ✓ eula aceptado — eula.txt
+  ✓ jar del engine descargado — paper-1.20.4-499.jar
+  ✓ arranque real (Done) — el server completó el arranque
+  ✓ sin findings — diagnóstico limpio
+  ✓ solo lectura respetada — applied: 0
+  ✓ score 100 — 100/100 — SANO
+```
+
+El **veredicto** —lo único que decide si un CI pasa o falla— es puro, y va con
+golden en `tests/golden/selftest.json`: cinco casos, cuatro de ellos malos (no
+arranca, con un finding, aplicó algo en solo lectura, varios fallos a la vez). Un
+verificador del que solo se prueba el «OK» no verifica nada; por eso el veredicto
+está separado de la función que hace E/S, en el núcleo y no en el CLI.
 
 Lo que la paridad ha cazado, y que ninguna lectura del código habría visto:
 

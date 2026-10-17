@@ -774,3 +774,112 @@ fn regla_plugin_update(
     }
     None
 }
+
+// ---------- el informe y el veredicto del self-test ----------
+
+/// El informe del doctor tal cual sale por JSON (`DoctorReport`).
+///
+/// Vive en el núcleo y no en el CLI porque es **datos**, no E/S: el CLI lo llena y
+/// lo imprime, pero el veredicto del self-test —que es lo que decide si un CI pasa
+/// o falla— se calcula sobre esto, y eso tiene que poder probarse sin arrancar un
+/// server.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Informe {
+    pub findings: Vec<HallazgoJson>,
+    pub applied: Vec<String>,
+    pub pending: Vec<String>,
+    pub score: u32,
+    pub grade: &'static str,
+    pub boot_tested: bool,
+    pub boot_ok: bool,
+}
+
+/// Un hallazgo tal cual sale por JSON: el `fix` va anidado y **se omite** si no lo
+/// hay, porque el TS escribe `undefined` y `JSON.stringify` tira la clave.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
+pub struct HallazgoJson {
+    pub severity: &'static str,
+    pub code: String,
+    pub source: String,
+    pub message: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub fix: Option<FixJson>,
+}
+
+/// Los metadatos del fix que ve el usuario (`apply` no se serializa nunca).
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
+pub struct FixJson {
+    pub code: String,
+    pub description: String,
+    pub considerable: bool,
+}
+
+/// Proyecta un hallazgo a lo que se escribe por JSON.
+pub fn a_json(f: &Finding) -> HallazgoJson {
+    HallazgoJson {
+        severity: f.severity.as_str(),
+        code: f.code.clone(),
+        source: f.source.clone(),
+        message: f.message.clone(),
+        fix: f.fix_code.as_ref().map(|code| FixJson {
+            code: code.clone(),
+            description: f.fix_description.clone().unwrap_or_default(),
+            considerable: f.fix_considerable,
+        }),
+    }
+}
+
+/// Un paso del veredicto del self-test (`{ name, ok, detail }`).
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
+pub struct Paso {
+    pub name: String,
+    pub ok: bool,
+    pub detail: String,
+}
+
+/// El veredicto del self-test, como función pura sobre el informe (`evaluateSelfTest`).
+///
+/// Está separado de la ejecución a propósito, y por la misma razón que en el TS: es
+/// lo único que decide si el CI pasa o falla, y dentro de la función que hace E/S no
+/// había forma de probar el caso malo —solo el camino feliz, ejecutando el self-test
+/// entero, que es justo lo que no se puede permitir en un test unitario. Un
+/// verificador del que solo se prueba el «OK» no verifica nada.
+pub fn evaluar_self_test(informe: &Informe) -> Vec<Paso> {
+    let codigos: Vec<&str> = informe.findings.iter().map(|f| f.code.as_str()).collect();
+    let paso = |name: &str, ok: bool, detail: String| Paso {
+        name: name.to_string(),
+        ok,
+        detail,
+    };
+    vec![
+        paso(
+            "arranque real (Done)",
+            informe.boot_ok,
+            if informe.boot_ok {
+                "el server completó el arranque".to_string()
+            } else {
+                "no llegó a Done".to_string()
+            },
+        ),
+        paso(
+            "sin findings",
+            codigos.is_empty(),
+            if codigos.is_empty() {
+                "diagnóstico limpio".to_string()
+            } else {
+                codigos.join(", ")
+            },
+        ),
+        paso(
+            "solo lectura respetada",
+            informe.applied.is_empty(),
+            format!("applied: {}", informe.applied.len()),
+        ),
+        paso(
+            "score 100",
+            informe.score == 100,
+            format!("{}/100 — {}", informe.score, informe.grade),
+        ),
+    ]
+}

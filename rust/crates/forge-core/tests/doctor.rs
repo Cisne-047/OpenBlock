@@ -182,3 +182,60 @@ fn el_heap_se_reescribe_con_los_dos_regex() {
         );
     }
 }
+
+#[test]
+fn el_veredicto_del_self_test_coincide_con_el_del_ts() {
+    // es lo unico que decide si un CI pasa o falla: si esto miente, no verifica nada
+    let p = repo_root().join("rust/crates/forge-core/tests/golden/selftest.json");
+    let txt =
+        fs::read_to_string(&p).unwrap_or_else(|e| panic!("no se pudo leer {}: {e}", p.display()));
+    let g: serde_json::Value = serde_json::from_str(&txt).expect("golden invalido");
+    let casos = g["casos"].as_array().expect("casos del self-test");
+    assert!(casos.len() >= 4);
+    for c in casos {
+        // el `grade` del núcleo es `&'static str` (es una de las cuatro notas), así
+        // que se recalcula con `nota`: si el golden trajera otra, el propio score lo
+        // delataría
+        let score = c["informe"]["score"].as_u64().unwrap() as u32;
+        let informe = doctor::Informe {
+            findings: c["informe"]["findings"]
+                .as_array()
+                .map(|fs| {
+                    fs.iter()
+                        .map(|f| doctor::HallazgoJson {
+                            severity: match f["severity"].as_str().unwrap() {
+                                "error" => "error",
+                                "warning" => "warning",
+                                _ => "info",
+                            },
+                            code: f["code"].as_str().unwrap().to_string(),
+                            source: f["source"].as_str().unwrap_or("").to_string(),
+                            message: f["message"].as_str().unwrap_or("").to_string(),
+                            fix: None,
+                        })
+                        .collect()
+                })
+                .unwrap_or_default(),
+            applied: c["informe"]["applied"]
+                .as_array()
+                .map(|a| {
+                    a.iter()
+                        .map(|x| x.as_str().unwrap_or("").to_string())
+                        .collect()
+                })
+                .unwrap_or_default(),
+            pending: Vec::new(),
+            score,
+            grade: doctor::nota(score),
+            boot_tested: c["informe"]["bootTested"].as_bool().unwrap_or(false),
+            boot_ok: c["informe"]["bootOk"].as_bool().unwrap_or(false),
+        };
+        let salida = serde_json::to_string(&doctor::evaluar_self_test(&informe)).unwrap();
+        assert_eq!(
+            salida,
+            c["salida_json"].as_str().unwrap(),
+            "caso «{}»",
+            c["nombre"].as_str().unwrap()
+        );
+    }
+}

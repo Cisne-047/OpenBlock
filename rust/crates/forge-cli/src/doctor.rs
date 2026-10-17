@@ -16,11 +16,10 @@
 //! usan los scripts— sí está completo.
 
 use forge_core::doctor::{
-    dedupe_por_codigo, etiqueta_pendiente, evaluar_estaticas, evaluar_log, score_y_nota,
-    siguen_rotos, ContextoEstatico, ContextoLog, Finding, Hechos, Severity, VistaServidor,
+    a_json, dedupe_por_codigo, etiqueta_pendiente, evaluar_estaticas, evaluar_log, score_y_nota,
+    siguen_rotos, ContextoEstatico, ContextoLog, Finding, Hechos, Informe, Severity, VistaServidor,
 };
 use forge_core::types::{EngineId, ServerConfig};
-use serde::Serialize;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::time::{Duration, Instant};
@@ -98,53 +97,6 @@ fn regex_lite(patron: &str) -> Option<regex::Regex> {
 }
 
 // ---------- el informe ----------
-
-/// El mismo JSON que escribe `doctor --json` en el TS, en el mismo orden.
-#[derive(Debug, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct Informe {
-    pub findings: Vec<HallazgoJson>,
-    pub applied: Vec<String>,
-    pub pending: Vec<String>,
-    pub score: u32,
-    pub grade: &'static str,
-    pub boot_tested: bool,
-    pub boot_ok: bool,
-}
-
-/// Un hallazgo tal cual sale por JSON: el `fix` va anidado y **se omite** si no lo
-/// hay, porque el TS escribe `undefined` y `JSON.stringify` tira la clave.
-#[derive(Debug, Serialize)]
-pub struct HallazgoJson {
-    pub severity: &'static str,
-    pub code: String,
-    pub source: String,
-    pub message: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub fix: Option<FixJson>,
-}
-
-/// Los metadatos del fix que ve el usuario (`apply` no se serializa nunca).
-#[derive(Debug, Serialize)]
-pub struct FixJson {
-    pub code: String,
-    pub description: String,
-    pub considerable: bool,
-}
-
-fn a_json(f: &Finding) -> HallazgoJson {
-    HallazgoJson {
-        severity: f.severity.as_str(),
-        code: f.code.clone(),
-        source: f.source.clone(),
-        message: f.message.clone(),
-        fix: f.fix_code.as_ref().map(|code| FixJson {
-            code: code.clone(),
-            description: f.fix_description.clone().unwrap_or_default(),
-            considerable: f.fix_considerable,
-        }),
-    }
-}
 
 // ---------- los arreglos ----------
 

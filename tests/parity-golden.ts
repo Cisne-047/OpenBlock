@@ -54,6 +54,7 @@ import {
   quiltLoaderVersionsFrom,
 } from "../src/api/engines.js";
 import { planFor } from "./helpers.js";
+import { evaluateSelfTest } from "../src/selftest.js";
 import { evaluateLogRules, evaluateStaticRules, LOG_RULES, rewriteHeapFlags } from "../src/doctor.js";
 import type { DoctorContext, Finding } from "../src/doctor.js";import type { HardwareProfile, ServerConfig } from "../src/types.js";
 
@@ -491,6 +492,25 @@ const doctorGolden = {
     return casos.map((c) => ({ ...c, salida: rewriteHeapFlags(c.entrada, c.ramMB) }));
   })(),
 };
+// Self-test: el veredicto. Es lo unico que decide si un CI pasa o falla, y dentro
+// de la funcion que hace E/S solo se podia probar el camino feliz.
+const goldenSelfTest = {
+  casos: [
+    { nombre: "todo bien", informe: { findings: [], applied: [], pending: [], score: 100, grade: "SANO", bootTested: true, bootOk: true } },
+    { nombre: "no arranca", informe: { findings: [], applied: [], pending: [], score: 100, grade: "SANO", bootTested: true, bootOk: false } },
+    { nombre: "con un finding", informe: { findings: [{ severity: "error", code: "ENGINE_JAR_MISSING", source: "d", message: "m" }], applied: [], pending: [], score: 80, grade: "OK CON AVISOS", bootTested: true, bootOk: true } },
+    { nombre: "aplico algo en solo lectura", informe: { findings: [], applied: ["accept-eula"], pending: [], score: 100, grade: "SANO", bootTested: true, bootOk: true } },
+    { nombre: "varios fallos a la vez", informe: { findings: [{ severity: "error", code: "EULA_FILE", source: "eula.txt", message: "m" }, { severity: "warning", code: "SYNC_CHUNK_WRITES", source: "server.properties", message: "m" }], applied: ["install-java"], pending: [], score: 75, grade: "OK CON AVISOS", bootTested: false, bootOk: false } },
+  ].map(({ nombre, informe }) => ({
+    nombre,
+    informe,
+    salida_json: JSON.stringify(evaluateSelfTest(informe as never)),
+  })),
+};
+writeFileSync(join(golden, "selftest.json"), JSON.stringify(goldenSelfTest, null, 2) + "\n", "utf8");
+
+
+
 writeFileSync(join(golden, "doctor.json"), JSON.stringify(doctorGolden, null, 2) + "\n", "utf8");
 
 // Engines: el mapeo de las respuestas de las APIs de descarga. La respuesta en sí

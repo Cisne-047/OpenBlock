@@ -1,0 +1,93 @@
+{
+  "casos": [
+    {
+      "nombre": "todo bien",
+      "informe": {
+        "findings": [],
+        "applied": [],
+        "pending": [],
+        "score": 100,
+        "grade": "SANO",
+        "bootTested": true,
+        "bootOk": true
+      },
+      "salida_json": "[{\"name\":\"arranque real (Done)\",\"ok\":true,\"detail\":\"el server completó el arranque\"},{\"name\":\"sin findings\",\"ok\":true,\"detail\":\"diagnóstico limpio\"},{\"name\":\"solo lectura respetada\",\"ok\":true,\"detail\":\"applied: 0\"},{\"name\":\"score 100\",\"ok\":true,\"detail\":\"100/100 — SANO\"}]"
+    },
+    {
+      "nombre": "no arranca",
+      "informe": {
+        "findings": [],
+        "applied": [],
+        "pending": [],
+        "score": 100,
+        "grade": "SANO",
+        "bootTested": true,
+        "bootOk": false
+      },
+      "salida_json": "[{\"name\":\"arranque real (Done)\",\"ok\":false,\"detail\":\"no llegó a Done\"},{\"name\":\"sin findings\",\"ok\":true,\"detail\":\"diagnóstico limpio\"},{\"name\":\"solo lectura respetada\",\"ok\":true,\"detail\":\"applied: 0\"},{\"name\":\"score 100\",\"ok\":true,\"detail\":\"100/100 — SANO\"}]"
+    },
+    {
+      "nombre": "con un finding",
+      "informe": {
+        "findings": [
+          {
+            "severity": "error",
+            "code": "ENGINE_JAR_MISSING",
+            "source": "d",
+            "message": "m"
+          }
+        ],
+        "applied": [],
+        "pending": [],
+        "score": 80,
+        "grade": "OK CON AVISOS",
+        "bootTested": true,
+        "bootOk": true
+      },
+      "salida_json": "[{\"name\":\"arranque real (Done)\",\"ok\":true,\"detail\":\"el server completó el arranque\"},{\"name\":\"sin findings\",\"ok\":false,\"detail\":\"ENGINE_JAR_MISSING\"},{\"name\":\"solo lectura respetada\",\"ok\":true,\"detail\":\"applied: 0\"},{\"name\":\"score 100\",\"ok\":false,\"detail\":\"80/100 — OK CON AVISOS\"}]"
+    },
+    {
+      "nombre": "aplico algo en solo lectura",
+      "informe": {
+        "findings": [],
+        "applied": [
+          "accept-eula"
+        ],
+        "pending": [],
+        "score": 100,
+        "grade": "SANO",
+        "bootTested": true,
+        "bootOk": true
+      },
+      "salida_json": "[{\"name\":\"arranque real (Done)\",\"ok\":true,\"detail\":\"el server completó el arranque\"},{\"name\":\"sin findings\",\"ok\":true,\"detail\":\"diagnóstico limpio\"},{\"name\":\"solo lectura respetada\",\"ok\":false,\"detail\":\"applied: 1\"},{\"name\":\"score 100\",\"ok\":true,\"detail\":\"100/100 — SANO\"}]"
+    },
+    {
+      "nombre": "varios fallos a la vez",
+      "informe": {
+        "findings": [
+          {
+            "severity": "error",
+            "code": "EULA_FILE",
+            "source": "eula.txt",
+            "message": "m"
+          },
+          {
+            "severity": "warning",
+            "code": "SYNC_CHUNK_WRITES",
+            "source": "server.properties",
+            "message": "m"
+          }
+        ],
+        "applied": [
+          "install-java"
+        ],
+        "pending": [],
+        "score": 75,
+        "grade": "OK CON AVISOS",
+        "bootTested": false,
+        "bootOk": false
+      },
+      "salida_json": "[{\"name\":\"arranque real (Done)\",\"ok\":false,\"detail\":\"no llegó a Done\"},{\"name\":\"sin findings\",\"ok\":false,\"detail\":\"EULA_FILE, SYNC_CHUNK_WRITES\"},{\"name\":\"solo lectura respetada\",\"ok\":false,\"detail\":\"applied: 1\"},{\"name\":\"score 100\",\"ok\":false,\"detail\":\"75/100 — OK CON AVISOS\"}]"
+    }
+  ]
+}
