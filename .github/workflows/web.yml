@@ -46,6 +46,9 @@ jobs:
 
       - name: páginas
         uses: actions/configure-pages@v5
+        with:
+          # habilita Pages en el repo la primera vez, sin tocar ajustes a mano
+          enablement: true
 
       - name: subir artefacto
         uses: actions/upload-pages-artifact@v3
