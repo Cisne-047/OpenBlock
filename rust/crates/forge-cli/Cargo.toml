@@ -17,6 +17,8 @@ serde_json.workspace = true
 regex.workspace = true
 getrandom = "0.2"
 zip = { version = "2", default-features = false, features = ["deflate"] }
+# md-5: UUID offline (md5 de "OfflinePlayer:<nombre>", versión 3) para whitelist/op
+md-5 = "0.10"
 
 [dev-dependencies]
 sha2 = "0.10"
