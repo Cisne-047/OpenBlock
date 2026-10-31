@@ -16,3 +16,6 @@ openblock-server/
 .env
 .env.*
 !.env.example
+
+# artefacto de wasm-pack: se recompila con `wasm-pack build rust/crates/forge-wasm --target web --out-dir ../../web/pkg`
+web/pkg/

@@ -25,6 +25,8 @@ pub struct OpcionesApply {
     pub dry_run: bool,
     /// fuerza re-descarga aunque el fichero exista
     pub force: bool,
+    /// mundos de otra instalación que se copian al final (ruta a la carpeta world)
+    pub import_world: Option<String>,
 }
 
 /// Escribe el `FileMap` en un directorio (`writeProject`).
@@ -178,6 +180,64 @@ pub fn apply_config(
         },
         dir.display()
     ));
+
+    // mundos importados: copia tal cual, después de todo lo demás
+    if let Some(origen) = &opts.import_world {
+        importar_mundos(Path::new(origen), &dir, log)?;
+    }
+
+    // ficha en el registro de servers de esta máquina (forge list); que falle
+    // no puede tumbar un install que ya ha ido bien
+    crate::registry::registrar(cfg, &dir);
+    Ok(())
+}
+
+/// Copia world/world_nether/world_the_end de otra instalación.
+///
+/// El origen puede ser la carpeta `world` en sí o su padre (una instalación
+/// vieja): se mira qué hay y se copia lo que exista.
+fn importar_mundos(origen: &Path, dir: &Path, log: &mut dyn FnMut(String)) -> Result<(), String> {
+    let padre = if origen.file_name().is_some_and(|n| n == "world") {
+        origen.parent().unwrap_or(origen).to_path_buf()
+    } else {
+        origen.to_path_buf()
+    };
+    let mut copiados = 0;
+    for mundo in ["world", "world_nether", "world_the_end"] {
+        let de = padre.join(mundo);
+        if !de.exists() {
+            continue;
+        }
+        let a = dir.join(mundo);
+        if a.exists() {
+            log(format!("• {mundo} ya existe aquí: no se toca"));
+            continue;
+        }
+        copiar_dir(&de, &a).map_err(|e| format!("copiar {mundo}: {e}"))?;
+        log(format!("✓ {mundo} importado"));
+        copiados += 1;
+    }
+    if copiados == 0 {
+        return Err(format!(
+            "en {} no hay world/ que importar (¿ruta correcta?)",
+            padre.display()
+        ));
+    }
+    Ok(())
+}
+
+/// cp -r de toda la vida
+fn copiar_dir(de: &Path, a: &Path) -> std::io::Result<()> {
+    std::fs::create_dir_all(a)?;
+    for e in std::fs::read_dir(de)? {
+        let e = e?;
+        let destino = a.join(e.file_name());
+        if e.metadata()?.is_dir() {
+            copiar_dir(&e.path(), &destino)?;
+        } else {
+            std::fs::copy(e.path(), destino)?;
+        }
+    }
     Ok(())
 }
 

@@ -12,18 +12,26 @@
 mod advanced;
 mod apply;
 mod bench;
+mod completions;
 mod console;
+mod content;
 mod detect;
 mod doctor;
+mod export;
 mod guided;
 mod java;
 mod lists;
+mod logs;
 mod players;
+mod pregen;
 mod rcon;
+mod registry;
 mod restore;
+mod schedule;
 mod selftest;
 mod status;
 mod update;
+mod world;
 
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -50,9 +58,24 @@ forge — forja servidores de Minecraft según tu hardware (Windows/Linux)
                                   Escribe el proyecto desde config y plan
   forge info <dir>                Config del server instalado
   forge status <dir>              ¿Vivo? Jugadores, TPS (spark) y cómo entrar
+      --wait-healthy [s]          espera a que arranque (para scripts; sale 0/1)
+      --webhook <URL>             un aviso (Discord) si caído o TPS<15 (para cron)
   forge console <dir>             Consola del server por RCON (exit para salir)
-  forge update <dir> [--build N]  Sube de build/engine sin tocar el mundo
+  forge logs <dir> [-f] [--errors] [--player X]
+                                  tail del log, con filtros
+  forge search <texto> [--mod]    plugins/mods en Modrinth, antes de instalar
+  forge plugins <dir> add|remove|list|update   (mods: igual, en mods/)
+  forge pregen <dir> [--radius N] pregenera con Chunky (server vivo) y muestra %
+  forge world <dir> info|trim [--radius N]
+                                  tamaño/seed/borde; trim encoge el mundo al borde
+  forge export <dir> [--world] [--out x.zip]
+                                  el server instalado como zip portable
+  forge list [--forget <dir>]     servers registrados en esta máquina + estado
+  forge update <dir> [--build N|latest]  Sube de build/engine sin tocar el mundo
       [--loader-build N] [--mc V] [--dry-run]
+  forge backup <dir> [--rclone <remote:ruta>]  backup local (+ copia remota)
+  forge new                       el guided, con perfiles de arranque rápido
+  forge completions bash|zsh|fish|powershell
   forge whitelist <dir> a|r|l [jugadores…]
   forge op <dir> add|remove|list [jugadores…]
                                   Gente en whitelist.json/ops.json (UUID resuelto;
@@ -165,6 +188,23 @@ fn main() -> ExitCode {
         Some("op") => players::op_cmd(&args[1..]),
         Some("versions") => lists::versions_cmd(&args[1..]),
         Some("builds") => lists::builds_cmd(&args[1..]),
+        Some("logs") => logs::logs_cmd(&args[1..]),
+        Some("search") => content::search_cmd(&args[1..]),
+        Some("plugins") => content::plugins_cmd(&args[1..]),
+        Some("mods") => content::mods_cmd(&args[1..]),
+        Some("pregen") => pregen::pregen_cmd(&args[1..]),
+        Some("world") => world::world_cmd(&args[1..]),
+        Some("list") => registry::list_cmd(&args[1..]),
+        Some("export") => export::export_cmd(&args[1..]),
+        Some("completions") => completions::completions_cmd(&args[1..]),
+        // `new` es el guided con nombre de "crear server": lo que hace un perfil
+        Some("new") => match guided::guided() {
+            Ok(()) => ExitCode::SUCCESS,
+            Err(e) => {
+                eprintln!("{e}");
+                ExitCode::FAILURE
+            }
+        },
         // `smoke` era el alias del TS (y el nombre del job de CI que lo ejecuta).
         Some("self-test") | Some("smoke") => self_test_cmd(&args[1..]),
         Some("latest") => latest_cmd(),
@@ -301,6 +341,9 @@ fn plan_cmd(args: &[String]) -> ExitCode {
 /// que estar instalado. El `serverDir` que trae el JSON puede ser de otro SO (un zip
 /// generado en Windows y abierto en Linux), así que si no existe se usa `--dir`.
 fn doctor_cmd(args: &[String]) -> ExitCode {
+    if args.iter().any(|a| a == "--schedule") {
+        return schedule::schedule_cmd(args);
+    }
     let mut dir = ".".to_string();
     let mut json = false;
     let mut boot = false;
@@ -447,6 +490,7 @@ fn install_cmd(args: &[String]) -> ExitCode {
         cores: a.cores.unwrap_or_else(num_cpus),
         dry_run: a.dry_run,
         force: a.force,
+        import_world: a.import_world.clone(),
     };
 
     if let Err(e) = apply::apply_config(&mut cfg, &opts, &mut |l| println!("{l}")) {
@@ -653,14 +697,65 @@ fn self_test_cmd(args: &[String]) -> ExitCode {
 
 /// `forge backup <dir>` — ejecuta el script de backup del server.
 fn backup_cmd(args: &[String]) -> ExitCode {
-    let Some(dir) = args.first() else {
-        eprintln!("uso: forge backup <dir>");
+    let pos: Vec<&String> = args.iter().filter(|a| !a.starts_with('-')).collect();
+    let Some(dir) = pos.first().copied() else {
+        eprintln!("uso: forge backup <dir> [--rclone <remote:ruta>]");
         return ExitCode::from(2);
     };
+    // --rclone remoto:ruta → tras el backup local, copia el último al remoto
+    // con rclone (que tiene que estar instalado; es la única pieza externa)
+    let rclone = args
+        .iter()
+        .position(|a| a == "--rclone")
+        .and_then(|i| args.get(i + 1))
+        .cloned();
     match apply::run_backup(dir) {
-        Ok(()) => ExitCode::SUCCESS,
+        Ok(()) => {
+            if let Some(remote) = rclone {
+                return subir_rclone(dir, &remote);
+            }
+            ExitCode::SUCCESS
+        }
         Err(e) => {
             eprintln!("{e}");
+            ExitCode::FAILURE
+        }
+    }
+}
+
+/// copia el backup más reciente a un remoto de rclone (S3, B2, Drive, SFTP…)
+fn subir_rclone(dir: &str, remote: &str) -> ExitCode {
+    let backups = resolver(dir).join("backups");
+    let ultimo = std::fs::read_dir(&backups).ok().and_then(|rs| {
+        rs.flatten()
+            .filter(|e| e.file_name().to_string_lossy().starts_with("backup-"))
+            .max_by_key(|e| e.metadata().and_then(|m| m.modified()).ok())
+            .map(|e| e.path())
+    });
+    let Some(ultimo) = ultimo else {
+        eprintln!("No hay backup reciente que subir");
+        return ExitCode::FAILURE;
+    };
+    println!("↑ {} → {remote}", ultimo.display());
+    let out = std::process::Command::new("rclone")
+        .args(["copy"])
+        .arg(&ultimo)
+        .arg(remote)
+        .output();
+    match out {
+        Ok(o) if o.status.success() => {
+            println!("✓ subido a {remote}");
+            ExitCode::SUCCESS
+        }
+        Ok(o) => {
+            eprintln!(
+                "rclone falló: {}",
+                String::from_utf8_lossy(&o.stderr).trim()
+            );
+            ExitCode::FAILURE
+        }
+        Err(_) => {
+            eprintln!("rclone no está instalado (https://rclone.org/install); el backup local sí está hecho");
             ExitCode::FAILURE
         }
     }

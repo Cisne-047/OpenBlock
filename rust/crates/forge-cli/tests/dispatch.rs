@@ -130,3 +130,61 @@ fn comando_desconocido_imprime_el_uso() {
     assert_eq!(codigo(&o), 2);
     assert!(salida(&o).contains("uso: forge <comando> [opciones]"));
 }
+
+/// La lista de completados tiene que ser la superficie real: cada subcomando
+/// del dispatch aparece en `forge completions bash`, y lo que está en la lista
+/// responde a algo (no hay fantasmas). Es el test que obliga a actualizar
+/// `SUBCOMANDOS` cuando se añade un comando.
+#[test]
+fn completions_cubren_la_superficie() {
+    let o = forge(&["completions", "bash"]);
+    assert_eq!(codigo(&o), 0);
+    let out = String::from_utf8_lossy(&o.stdout).to_string();
+    // el -W "lista" mete los comandos entre comillas: fuera, y a tokens
+    let sin_comillas = out.replace('"', " ");
+    let tokens: Vec<&str> = sin_comillas.split_whitespace().collect();
+    for c in forge_cli_publicos() {
+        assert!(tokens.contains(&c), "falta «{c}» en completions");
+    }
+    // y el resto de shells también salen sin error
+    for sh in ["zsh", "fish", "powershell"] {
+        assert_eq!(codigo(&forge(&["completions", sh])), 0, "{sh} roto");
+    }
+}
+
+/// los subcomandos que el help largo menciona por su nombre de invocación
+fn forge_cli_publicos() -> Vec<&'static str> {
+    vec![
+        "bench",
+        "builds",
+        "backup",
+        "completions",
+        "console",
+        "detect",
+        "doctor",
+        "dump",
+        "export",
+        "generate",
+        "guided",
+        "info",
+        "install",
+        "latest",
+        "list",
+        "logs",
+        "mods",
+        "new",
+        "plan",
+        "plugins",
+        "pregen",
+        "rcon",
+        "restore",
+        "search",
+        "self-test",
+        "status",
+        "stop",
+        "update",
+        "versions",
+        "whitelist",
+        "world",
+    ]
+}

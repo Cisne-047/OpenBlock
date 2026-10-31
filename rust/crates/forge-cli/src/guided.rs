@@ -137,33 +137,68 @@ pub fn guided() -> Result<(), String> {
         "dedicada",
     )?;
 
-    let modo = ask_choice(
-        "¿Qué server quieres montar?",
+    // perfiles: tres teclas y las decisiones gruesas ya tomadas; "a medida" es
+    // el flujo de siempre. El perfil solo fija defaults de las preguntas de
+    // abajo —todo lo demás (RAM, puerto, directorio…) sigue preguntando.
+    let perfil = ask_choice(
+        "¿Perfil de arranque rápido?",
         &[
             (
-                "facil",
-                "Súper fácil",
-                "recomendado por tu hardware, todo automático",
+                "amigos",
+                "Vanilla con amigos",
+                "Paper + plugins de rendimiento: privado para 5-15",
             ),
             (
-                "plugins",
-                "Paper con plugins de rendimiento",
-                "el estándar para jugar con amigos",
+                "ligero",
+                "Modpack ligero",
+                "Fabric con Lithium/C2ME: explorar con mods",
             ),
             (
-                "modpack",
-                "Modpack",
-                "URL de Modrinth o zip exportado de CurseForge",
+                "publico",
+                "Server público",
+                "Purpur, agresivo, whitelist y servicio: aguantar gente",
             ),
-            ("modded", "Modded a mano (Fabric/Forge/NeoForge)", ""),
             (
-                "vanilla",
-                "Vanilla puro",
-                "sin optimizaciones, tal cual Mojang",
+                "medida",
+                "A medida",
+                "el wizard completo, pregunta a pregunta",
             ),
         ],
-        "facil",
+        "amigos",
     )?;
+
+    let modo = match perfil.as_str() {
+        "amigos" => "facil".to_string(),
+        "ligero" => "modded".to_string(),
+        "publico" => "facil".to_string(),
+        _ => ask_choice(
+            "¿Qué server quieres montar?",
+            &[
+                (
+                    "facil",
+                    "Súper fácil",
+                    "recomendado por tu hardware, todo automático",
+                ),
+                (
+                    "plugins",
+                    "Paper con plugins de rendimiento",
+                    "el estándar para jugar con amigos",
+                ),
+                (
+                    "modpack",
+                    "Modpack",
+                    "URL de Modrinth o zip exportado de CurseForge",
+                ),
+                ("modded", "Modded a mano (Fabric/Forge/NeoForge)", ""),
+                (
+                    "vanilla",
+                    "Vanilla puro",
+                    "sin optimizaciones, tal cual Mojang",
+                ),
+            ],
+            "facil",
+        )?,
+    };
 
     // --- el modpack: se resuelve ANTES de preguntar lo demás, porque de aquí salen
     // la versión de MC y el loader ---
@@ -178,7 +213,12 @@ pub fn guided() -> Result<(), String> {
 
     match modo.as_str() {
         "facil" => {
-            engine = tier.recommended_engine;
+            // el perfil público prefiere purpur (más perillas de config)
+            engine = if perfil == "publico" {
+                EngineId::Purpur
+            } else {
+                tier.recommended_engine
+            };
             mc_version = forge_api::mojang::latest_release()
                 .map_err(|e| e.to_string())?
                 .to_string();
@@ -340,7 +380,12 @@ pub fn guided() -> Result<(), String> {
             tier.pregen_radius
         },
     )?;
-    let perfil = ask_choice(
+    let perf_default = if perfil == "publico" {
+        "aggressive"
+    } else {
+        "balanced"
+    };
+    let perfil_perf = ask_choice(
         "Perfil de rendimiento",
         &[
             ("conservative", "Conservador", "toca lo mínimo"),
@@ -351,9 +396,12 @@ pub fn guided() -> Result<(), String> {
                 "más TPS, rangos de mobs reducidos",
             ),
         ],
-        "balanced",
+        perf_default,
     )?;
-    let service_enabled = confirm("¿Autoarranque como servicio del sistema?", false)?;
+    let service_enabled = confirm(
+        "¿Autoarranque como servicio del sistema?",
+        perfil == "publico",
+    )?;
     let backup_enabled = confirm("¿Backups automáticos (diarios, 7 copias)?", true)?;
 
     // plugins/mods propios, por URL o ruta local
@@ -431,11 +479,11 @@ pub fn guided() -> Result<(), String> {
         world_type: Default::default(),
         seed: String::new(),
         online_mode: true,
-        whitelist: false,
+        whitelist: perfil == "publico",
         pvp: true,
         hardcore: false,
         modpack,
-        performance: PerfProfile::parse(&perfil)
+        performance: PerfProfile::parse(&perfil_perf)
             .ok_or_else(|| format!("perfil desconocido: {perfil}"))?,
         pregen_radius,
         backup: BackupConfig {

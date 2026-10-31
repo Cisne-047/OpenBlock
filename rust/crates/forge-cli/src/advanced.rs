@@ -47,6 +47,8 @@ pub struct ArgsAvanzados {
     /// de cada comando, no de la config: generate --zip y el numero de hilos
     pub zip: Option<String>,
     pub cores: Option<u32>,
+    /// mundos de otra instalación que se copian al final del install
+    pub import_world: Option<String>,
 }
 
 /// Las flags que llevan valor, y qué hace cada una.
@@ -105,6 +107,7 @@ pub fn parse_avanzados(argv: &[String]) -> Result<ArgsAvanzados, String> {
             "pregen" => a.pregen = Some(parsear_numero(&tomar_valor(&mut i)?, "pregen")?),
             "modpack" => a.modpack = Some(tomar_valor(&mut i)?),
             "build" => a.build = Some(tomar_valor(&mut i)?),
+            "import-world" => a.import_world = Some(tomar_valor(&mut i)?),
             "loader-build" => a.loader_build = Some(tomar_valor(&mut i)?),
             "installer-build" => a.installer_build = Some(tomar_valor(&mut i)?),
             "custom" => {

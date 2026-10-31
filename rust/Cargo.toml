@@ -1,9 +1,9 @@
 [workspace]
 resolver = "2"
-members = ["crates/forge-core", "crates/forge-api", "crates/forge-cli"]
+members = ["crates/forge-core", "crates/forge-api", "crates/forge-cli", "crates/forge-wasm"]
 
 [workspace.package]
-version = "0.2.1"
+version = "0.3.0"
 edition = "2021"
 license = "MIT"
 

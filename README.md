@@ -35,7 +35,7 @@ Deja `forge` en `~/.local/bin` (Linux) o en `%LOCALAPPDATA%\OpenBlock` con el PA
 del usuario (Windows). Si prefieres bajarte el binario a mano, está en
 [Releases](https://github.com/Cisne-047/OpenBlock/releases):
 `forge-x86_64-unknown-linux-gnu` y `forge-x86_64-pc-windows-msvc.exe`. Los dos
-instaladores aceptan la versión (`OPENBLOCK_VERSION=0.2.1`, `-Version 0.2.0`), el
+instaladores aceptan la versión (`OPENBLOCK_VERSION=0.3.0`, `-Version 0.2.0`), el
 destino (`OPENBLOCK_BIN`) y el de Windows un `-DryRun` que dice qué haría sin bajar nada.
 
 ```bash
@@ -46,13 +46,20 @@ forge detect                       # hardware + tier + recomendación
 forge bench                        # + benchmark real de CPU y disco
 forge versions [n]                 # últimas releases de MC, live
 forge builds --engine paper --mc 1.21.4   # builds del engine (lo que acepta --build)
+forge search chunky               # plugins/mods en Modrinth, antes de instalar
+forge plugins ./server add spark  # (mods: igual). list/remove/update también
+forge logs ./server -f --errors   # tail del log con filtros
+forge pregen ./server             # pregenera con Chunky y muestra el % real
+forge world ./server info         # tamaños/seed/borde; trim encoge el mundo
+forge list                        # servers registrados + quién está arriba
+forge export ./server             # el server instalado como zip portable
 forge generate --zip server.zip    # proyecto portable sin instalar
 forge doctor --dir ./server        # mini-IA: dry run + fixes
 forge status ./server              # ¿vivo? jugadores, TPS (spark) y cómo entrar
 forge console ./server             # consola del server por RCON (exit para salir)
 forge update ./server              # sube de build/engine sin tocar el mundo
 forge whitelist ./server add Ana Beto   # (y remove/list, y `op` igual): UUID resuelto
-forge backup --dir ./server
+forge backup --dir ./server --rclone mi:buck            # (+ copia remota)
 forge restore ./server             # restaura el último backup (mundos actuales, apartados)
 forge stop --dir ./server          # apagado limpio por RCON
 forge self-test                    # instala un Paper real, lo arranca y lo diagnostica
@@ -183,6 +190,20 @@ distinto de cero, así que sirve de gate en CI (`.github/workflows/ci.yml`, job
 
 Opciones: `--mc 1.20.4` (su Java debe existir en la máquina; por defecto 1.20.4, que
 va con Java 17), `--port 25599` y `--keep` para no borrar el directorio.
+
+
+## El constructor web
+
+`web/index.html` es el generador en el navegador (como el de DistroForge): el
+núcleo Rust compilado a WASM hace todo el trabajo client-side —sin backend ni
+cuentas, config en `localStorage`— y el zip sale con JSZip. El plan de
+descargas no se puede resolver desde el navegador (CORS): `forge plan
+config.json plan.json` lo produce y la página lo pega.
+
+```bash
+wasm-pack build rust/crates/forge-wasm --target web --out-dir ../../web/pkg
+# y sirve web/ en local:  python -m http.server -d web 8080
+```
 
 ## Por qué existe
 

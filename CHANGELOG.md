@@ -4,6 +4,32 @@ Las etiquetas del repositorio siguen `vX.Y.Z`. La v0.2.0 es el port a Rust: el b
 
 OpenBlock es el hermano de [DistroForge](https://github.com/cisne-047/DistroForge) (que forja distros Linux): comparten arquitectura —config declarativa, generadores puros que producen un `FileMap`, round-trip del proyecto y comparación byte a byte— pero **no comparten código**. Aquí se registra solo lo que cambia en OpenBlock.
 
+## v0.3.0 (31/10/2026)
+
+### La tanda QoL: doce comandos para el día a día
+
+- **`forge search` + `forge plugins`/`forge mods`** — búsqueda en Modrinth e instalación por slug o URL: resuelve la versión para TU MC y loader, verifica el sha512 de Modrinth y avisa de que hace falta reiniciar. `list`/`remove` y `update` (catálogo + custom con URL) completan el ciclo.
+- **`forge pregen <dir>`** — la pregeneración como comando suelto, con **porcentaje real** leído del log de Chunky (el RCON de Chunky no expone progreso; el log sí).
+- **`forge logs <dir> [-f] [--errors] [--player X]`** — tail del log con filtros y re-apertura cuando rota.
+- **`forge world <dir> info|trim`** — tamaños reales (KB/MB/GB), seed, dificultad y borde; `trim` fija el borde con ChunkyBorder y encoge el mundo (`chunky trim`).
+- **`forge list`** — registro de servers en `~/.openblock/servers.json`: cada install deja ficha, y la tabla enseña quién está arriba. `--forget` quita fichas.
+- **`forge status --wait-healthy [s]`** — para scripts: espera el arranque y sale 0/1. **`--webhook <URL>`** avisa (formato Discord) si caído o TPS<15 — una pasada, para cron/timer.
+- **`forge backup --rclone <remote:ruta>`** — el backup local, y copia del último a S3/B2/Drive/SFTP con rclone.
+- **`forge export <dir> [--world]`** — el server instalado como zip portable (plugins incluidos; mundos y privados de sesión fuera, salvo `--world`).
+- **`forge doctor <dir> --schedule`** — escribe el timer de systemd (o el comando de schtasks en Windows) para el doctor semanal.
+- **`forge completions bash|zsh|fish|powershell`** — generadas estáticas; `tests/dispatch.rs` obliga a que cubran la superficie real.
+- **`forge new`** — alias del guided, que ahora abre con **perfiles** (vanilla con amigos / modpack ligero / público / a medida): tres teclas y las decisiones gruesas tomadas.
+- **`forge install --import-world <ruta>`** — mundos de otra instalación copiados al final (mundo ya existente no se toca).
+
+### El constructor web (el cierre con DistroForge)
+
+- **`crates/forge-wasm`** — `forge-core` (puro) compilado a WASM con wasm-bindgen: `generate_project_json`/`validate_json`. **`web/index.html`** es el constructor en el navegador, sin backend: config en `localStorage`, proyecto generado client-side, zip con JSZip. El plan de descargas no se resuelve en el navegador (CORS): `forge plan` lo produce y la página lo pega. `wasm-pack build` ya deja el `pkg/` compilado.
+
+### Calidad
+
+- **Fuzz del códec RCON**: bytes aleatorios al decodificador nunca panean, y el roundtrip fija por escrito el quirk latin1 del puerto (ASCII exacto; no-ASCII viaja con relleno, como el TS).
+- 52 tests en el CLI (13 nuevos), clippy `-D warnings` y fmt limpios, y E2E de los comandos nuevos contra APIs reales (search) y fixtures (export/logs/world/pregen-fallido/wait-healthy).
+
 ## v0.2.1 (31/10/2026)
 
 ### El día a día del server ya instalado

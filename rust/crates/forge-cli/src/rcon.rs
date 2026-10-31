@@ -269,3 +269,61 @@ mod tests {
         assert!(matches!(e, Error::Conexion(_)), "error inesperado: {e}");
     }
 }
+
+/// Fuzz barato del decodificador: bytes aleatorios nunca panean y el encode/
+/// decode roundtrip es estable. El RCON vive pegado a un socket de un server
+/// real; un panic aquí tumba console/stop/doctor al primer paquete raro.
+#[cfg(test)]
+mod fuzz {
+    use super::{decode_packet, encode_packet};
+
+    fn bytes_aleatorios(n: usize, semilla: u64) -> Vec<u8> {
+        // xorshift pequeñito: determinista, sin dependencias
+        let mut x = semilla | 1;
+        (0..n)
+            .map(|_| {
+                x ^= x << 13;
+                x ^= x >> 7;
+                x ^= x << 17;
+                (x >> 33) as u8
+            })
+            .collect()
+    }
+
+    #[test]
+    fn decode_de_basura_nunca_panea() {
+        for n in [0usize, 1, 3, 8, 13, 40, 260, 1024] {
+            for semilla in 1..=50u64 {
+                let buf = bytes_aleatorios(n, semilla * 1_000 + n as u64);
+                if buf.len() >= 4 {
+                    let _ = decode_packet(&buf); // None o valores locos, pero sin panic
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn roundtrip_de_cargas_utiles_raras() {
+        // ASCII puro (el 100% de los comandos reales): roundtrip exacto
+        for payload in ["", "list", "say hola", "chunks: \r\n\t mezclado"] {
+            let pkt = encode_packet(7, 2, payload);
+            let dec = decode_packet(&pkt).expect("paquete propio decodable");
+            assert_eq!(dec.id, 7);
+            assert_eq!(dec.kind, 2);
+            assert_eq!(dec.payload, payload);
+        }
+        // con NUL interno o no-ASCII, el roundtrip NO es exacto y es el quirk
+        // documentado del códec: el encode escribe latin1 pero declara la
+        // longitud UTF-8, así que lo que sobra viaja como ceros de relleno.
+        // Se fija que decodifica (y sin panic), no que sea bonito.
+        for payload in ["say hola\0con nul", "unicode: ñ ¿?"] {
+            let pkt = encode_packet(7, 2, payload);
+            let dec = decode_packet(&pkt).expect("decodable, aunque sea con relleno");
+            assert_eq!(dec.id, 7);
+            assert_eq!(dec.kind, 2);
+            assert!(dec
+                .payload
+                .starts_with(payload.split('\x00').next().unwrap_or("")));
+        }
+    }
+}

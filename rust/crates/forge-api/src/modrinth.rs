@@ -7,6 +7,7 @@
 
 use crate::net;
 use crate::url;
+use serde::Deserialize;
 use serde_json::Value;
 
 // Los tipos de la respuesta los tiene el núcleo desde el principio, que es donde
@@ -182,6 +183,45 @@ pub fn modrinth_modpack_slug(url: &str) -> String {
         Some(c) => c[1].to_string(),
         None => url.to_string(),
     }
+}
+
+/// Un resultado de búsqueda de Modrinth (`/v2/search`).
+#[derive(Debug, Clone, Default, Deserialize)]
+pub struct ResultadoSearch {
+    #[serde(default)]
+    pub slug: String,
+    #[serde(default)]
+    pub title: String,
+    #[serde(default)]
+    pub description: String,
+    #[serde(default)]
+    pub downloads: u64,
+    #[serde(default)]
+    pub project_type: String,
+}
+
+/// Búsqueda de proyectos en Modrinth, filtrada por tipo (plugin/mod).
+///
+/// Es la parte de "elegir contenido" que faltaba: `forge search essentials`
+/// antes de `forge plugins add Essentials`. Los `facets` van con la misma
+/// codificación de formulario que las demás queries.
+pub fn search(
+    query: &str,
+    project_type: &str,
+    limit: usize,
+) -> Result<Vec<ResultadoSearch>, Error> {
+    let facets = format!(r#"[["project_type:{project_type}"]]"#);
+    let destino = format!(
+        "{MR}/search?query={}&facets={}&limit={limit}",
+        url::encode_uri_component(query),
+        form_encode(&facets)
+    );
+    let v: Value = net::get_json(&destino)?;
+    let hits = v["hits"].as_array().cloned().unwrap_or_default();
+    Ok(hits
+        .into_iter()
+        .map(|h| serde_json::from_value(h).unwrap_or_default())
+        .collect())
 }
 
 #[cfg(test)]
