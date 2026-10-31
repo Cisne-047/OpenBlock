@@ -35,7 +35,7 @@ Deja `forge` en `~/.local/bin` (Linux) o en `%LOCALAPPDATA%\OpenBlock` con el PA
 del usuario (Windows). Si prefieres bajarte el binario a mano, está en
 [Releases](https://github.com/Cisne-047/OpenBlock/releases):
 `forge-x86_64-unknown-linux-gnu` y `forge-x86_64-pc-windows-msvc.exe`. Los dos
-instaladores aceptan la versión (`OPENBLOCK_VERSION=0.2.0`, `-Version 0.2.0`), el
+instaladores aceptan la versión (`OPENBLOCK_VERSION=0.2.1`, `-Version 0.2.0`), el
 destino (`OPENBLOCK_BIN`) y el de Windows un `-DryRun` que dice qué haría sin bajar nada.
 
 ```bash
@@ -44,13 +44,24 @@ forge guided                       # modo guiado: pregunta y instala
 forge install --config mi.json     # o por flags: forge install --engine paper --mc 1.21.4
 forge detect                       # hardware + tier + recomendación
 forge bench                        # + benchmark real de CPU y disco
+forge versions [n]                 # últimas releases de MC, live
+forge builds --engine paper --mc 1.21.4   # builds del engine (lo que acepta --build)
 forge generate --zip server.zip    # proyecto portable sin instalar
 forge doctor --dir ./server        # mini-IA: dry run + fixes
+forge status ./server              # ¿vivo? jugadores, TPS (spark) y cómo entrar
+forge console ./server             # consola del server por RCON (exit para salir)
+forge update ./server              # sube de build/engine sin tocar el mundo
+forge whitelist ./server add Ana Beto   # (y remove/list, y `op` igual): UUID resuelto
 forge backup --dir ./server
+forge restore ./server             # restaura el último backup (mundos actuales, apartados)
 forge stop --dir ./server          # apagado limpio por RCON
 forge self-test                    # instala un Paper real, lo arranca y lo diagnostica
 forge --version
 ```
+
+Los `start.sh`/`start.bat` generados llevan **bucle anti-crash**: un `stop` limpio
+sale, y un crash reinicia a los 5 s (`OPENBLOCK_AUTORESTART=0` lo desactiva para
+esa ejecución).
 
 Todo por flags, scriptable (`advanced` sigue existiendo como alias de `install`, que
 es el nombre que le daba el TypeScript):

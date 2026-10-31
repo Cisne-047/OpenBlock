@@ -4,6 +4,22 @@ Las etiquetas del repositorio siguen `vX.Y.Z`. La v0.2.0 es el port a Rust: el b
 
 OpenBlock es el hermano de [DistroForge](https://github.com/cisne-047/DistroForge) (que forja distros Linux): comparten arquitectura —config declarativa, generadores puros que producen un `FileMap`, round-trip del proyecto y comparación byte a byte— pero **no comparten código**. Aquí se registra solo lo que cambia en OpenBlock.
 
+## v0.2.1 (31/10/2026)
+
+### El día a día del server ya instalado
+
+- **`forge status <dir>`**: sondea el puerto, saca jugadores y TPS (spark) por RCON y enseña la IP local para entrar. Hasta ahora, leer el log.
+- **`forge console <dir>`**: la consola del server por RCON desde donde ya estás (`exit`/Ctrl+D para salir).
+- **`forge update <dir>`**: sube de build (o de versión con `--mc`) re-resolviendo el plan con la config instalada — baja el engine, refresca scripts/flags/README/`openblock.json`, borra el jar viejo y re-ejecuta el installer en forge/neoforge. **Mundo, properties, eula, whitelist, ops, plugins y mods no se tocan.** `--build latest` despina la build fijada, que antes no tenía vuelta; y actualizar a lo ya puesto avisa en vez de re-descargar.
+- **`forge restore <dir>`**: restaura un backup —apaga si hace falta, aparta los mundos actuales a `pre-restore-<ts>/` (backup malo no pierde nada) y descomprime (zip con librería, tar.gz con el tar del sistema). Sin `--file`, el más reciente de `backups/`.
+- **`forge whitelist` / `forge op`** (`add|remove|list`): resuelve el UUID —Mojang con online-mode, offline v3 (md5 de `OfflinePlayer:<nombre>`) sin él, fórmula cruzada byte a byte contra un cálculo independiente— y escribe los JSON bonitos; con el server arriba también se lo dice por RCON.
+- **`forge versions` / `forge builds`**: las releases de Mojang (marcando `latest.release`) y las builds de cualquier engine, live, antes de instalar nada. Es lo que acepta `--build`/`--loader-build`.
+
+### Los scripts generados ya no se rinden al primer crash
+
+- **Bucle anti-crash en `start.sh`/`start.bat`**: un `stop` limpio (código 0) sale; un crash reinicia a los 5 s. `OPENBLOCK_AUTORESTART=0` lo desactiva para esa ejecución. El `|| CODE=$?` del sh es para que `set -e` no mate el script justo en el crash que captura. En los **dos lados de la paridad** (Rust y TS legacy) con el golden regenerado.
+- Validado contra un Paper 26.3 real: boot con el bucle, `Done`, stop por RCON → el script sale solo y sin reintentos espurios; `update --build latest` lo subió de la 175 a la 231 dejando el mundo intacto.
+
 ## v0.2.0 (17/10/2026)
 
 ### El port a Rust, completo
