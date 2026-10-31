@@ -4,6 +4,19 @@ Las etiquetas del repositorio siguen `vX.Y.Z`. La v0.2.0 es el port a Rust: el b
 
 OpenBlock es el hermano de [DistroForge](https://github.com/cisne-047/DistroForge) (que forja distros Linux): comparten arquitectura —config declarativa, generadores puros que producen un `FileMap`, round-trip del proyecto y comparación byte a byte— pero **no comparten código**. Aquí se registra solo lo que cambia en OpenBlock.
 
+## v0.4.0 (31/10/2026)
+
+### El ciclo completo: arrancar, vigilar, contener
+
+- **`forge start <dir>`** — arranca el server desacoplado (`logs/forge-boot.log`); el bucle anti-crash del script sigue vivo. Par de `forge stop` que ya existía. El sleep del `.bat` pasa de `timeout` a `ping` porque `timeout.exe` exige consola y un arranque detached no la tiene.
+- **`forge watch <dir>`** — el dashboard: cada 2 s, arriba/caído, jugadores, TPS de spark y las últimas líneas del log, hasta Ctrl+C. ANSI pelado.
+- **`forge menu`** — el índice interactivo: lista lo cotidiano, pide directorio una vez y ejecuta.
+- **`forge pregen`** ahora arranca el server él solo si está caído (como install), en vez de exigirlo arriba.
+- **`forge doctor --all` / `backup --all`** — sobre el registro de `forge list`; `backup` gana `--rclone` al subir y `restore` gana `--rclone` al traer (el backup más nuevo del remoto).
+- **`forge status --telegram <chat_id>`** — aviso por bot de Telegram (token en `OPENBLOCK_TG_TOKEN`), hermano del `--webhook` de Discord.
+- **Dockerfile en el proyecto generado** — paridad con DistroForge (que también genera OCI): Temurin del Java que toca, `start.sh` como ENTRYPOINT, y `--restart unless-stopped` como política de arranque. `plugins update` ahora también re-descarga los customs con URL.
+- **El constructor web se despliega solo**: `web.yml` recompila el pkg de WASM en cada push a main y lo publica en GitHub Pages.
+
 ## v0.3.0 (31/10/2026)
 
 ### La tanda QoL: doce comandos para el día a día

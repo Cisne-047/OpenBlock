@@ -1,0 +1,64 @@
+# El constructor web (web/) publicado en GitHub Pages.
+#
+# Igual que DistroForge despliega su app en cada push a main, esto recompila
+# el pkg de WASM desde el fuente y publica web/ —la página no depende de ningún
+# artefacto versionado: lo que se sirve es lo que sale de compilar el commit.
+#
+# El plan de descargas NO se resuelve en la página (CORS): la página pega el
+# `forge plan` local, así que no hay secretos ni proxies aquí.
+
+name: web
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "rust/crates/forge-core/**"
+      - "rust/crates/forge-wasm/**"
+      - "web/**"
+      - ".github/workflows/web.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+
+      - name: wasm-pack
+        uses: jetli/wasm-pack-action@v0.4.0
+
+      - name: compilar el pkg
+        run: wasm-pack build rust/crates/forge-wasm --target web --out-dir ../../web/pkg
+
+      - name: páginas
+        uses: actions/configure-pages@v5
+
+      - name: subir artefacto
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: web
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: desplegar
+        id: deployment
+        uses: actions/deploy-pages@v4

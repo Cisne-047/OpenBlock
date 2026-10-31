@@ -101,7 +101,13 @@ pub fn list_cmd(args: &[String]) -> ExitCode {
         );
         return ExitCode::SUCCESS;
     }
-    println!("{NOMBRE:<16} {ENGINE:<10} {MC:<8} {PORT:<7} ESTADO", NOMBRE="NOMBRE", ENGINE="ENGINE", MC="MC", PORT="PUERTO");
+    println!(
+        "{NOMBRE:<16} {ENGINE:<10} {MC:<8} {PORT:<7} ESTADO",
+        NOMBRE = "NOMBRE",
+        ENGINE = "ENGINE",
+        MC = "MC",
+        PORT = "PUERTO"
+    );
     for f in &fichas {
         let estado = if puerto_abierto(f.port) {
             "arriba"

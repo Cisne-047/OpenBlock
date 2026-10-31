@@ -35,7 +35,7 @@ Deja `forge` en `~/.local/bin` (Linux) o en `%LOCALAPPDATA%\OpenBlock` con el PA
 del usuario (Windows). Si prefieres bajarte el binario a mano, está en
 [Releases](https://github.com/Cisne-047/OpenBlock/releases):
 `forge-x86_64-unknown-linux-gnu` y `forge-x86_64-pc-windows-msvc.exe`. Los dos
-instaladores aceptan la versión (`OPENBLOCK_VERSION=0.3.0`, `-Version 0.2.0`), el
+instaladores aceptan la versión (`OPENBLOCK_VERSION=0.4.0`, `-Version 0.2.0`), el
 destino (`OPENBLOCK_BIN`) y el de Windows un `-DryRun` que dice qué haría sin bajar nada.
 
 ```bash
@@ -44,6 +44,8 @@ forge guided                       # modo guiado: pregunta y instala
 forge install --config mi.json     # o por flags: forge install --engine paper --mc 1.21.4
 forge detect                       # hardware + tier + recomendación
 forge bench                        # + benchmark real de CPU y disco
+forge start ./server              # arranca desacoplado (par de stop); watch = dashboard
+forge menu                        # el índice interactivo de lo cotidiano
 forge versions [n]                 # últimas releases de MC, live
 forge builds --engine paper --mc 1.21.4   # builds del engine (lo que acepta --build)
 forge search chunky               # plugins/mods en Modrinth, antes de instalar
@@ -193,6 +195,8 @@ va con Java 17), `--port 25599` y `--keep` para no borrar el directorio.
 
 
 ## El constructor web
+
+Desplegado en cada push a main por `web.yml` (GitHub Pages del repo).
 
 `web/index.html` es el generador en el navegador (como el de DistroForge): el
 núcleo Rust compilado a WASM hace todo el trabajo client-side —sin backend ni

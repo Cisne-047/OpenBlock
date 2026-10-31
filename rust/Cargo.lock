@@ -120,7 +120,7 @@ dependencies = [
 
 [[package]]
 name = "forge-api"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "forge-core",
  "regex",
@@ -132,7 +132,7 @@ dependencies = [
 
 [[package]]
 name = "forge-cli"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "forge-api",
  "forge-core",
@@ -147,7 +147,7 @@ dependencies = [
 
 [[package]]
 name = "forge-core"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "regex",
  "serde",
@@ -156,7 +156,7 @@ dependencies = [
 
 [[package]]
 name = "forge-wasm"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "forge-core",
  "serde",
