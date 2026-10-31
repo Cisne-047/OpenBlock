@@ -36,8 +36,13 @@ jobs:
         with:
           targets: wasm32-unknown-unknown
 
-      - name: wasm-pack
-        uses: jetli/wasm-pack-action@v0.4.0
+      # la action empaqueta versiones viejas de wasm-pack que no entienden
+      # `version.workspace` del Cargo.toml; la misma 0.15 que se usa en local
+      - name: wasm-pack 0.15 (binario, como en local)
+        run: |
+          curl -fsSL https://github.com/rustwasm/wasm-pack/releases/download/v0.15.1/wasm-pack-v0.15.1-x86_64-unknown-linux-musl.tar.gz             | tar xz --strip-components=1
+          mv wasm-pack ~/.cargo/bin/wasm-pack
+          wasm-pack --version
 
       - name: compilar el pkg
         run: wasm-pack build rust/crates/forge-wasm --target web --out-dir ../../web/pkg
