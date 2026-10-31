@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>OpenBlock — constructor web</title>
+<style>
+  :root { --bg:#1d1d21; --panel:#2b2b31; --line:#3d3d46; --txt:#e8e8e8; --dim:#9a9aa3; --green:#55bd6a; --gold:#e8a33d; }
+  * { box-sizing:border-box; }
+  body { background:var(--bg); color:var(--txt); font:14px/1.5 ui-monospace,Menlo,Consolas,monospace; margin:0; padding:24px; }
+  h1 { color:var(--green); font-size:20px; margin:0 0 4px; }
+  .sub { color:var(--dim); margin:0 0 20px; }
+  .grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(210px,1fr)); gap:12px; max-width:1100px; }
+  .card { background:var(--panel); border:1px solid var(--line); border-radius:8px; padding:14px; }
+  label { display:block; color:var(--dim); font-size:12px; margin-bottom:4px; }
+  input, select, textarea { width:100%; background:var(--bg); color:var(--txt); border:1px solid var(--line); border-radius:6px; padding:7px 9px; font:inherit; }
+  textarea { min-height:110px; resize:vertical; }
+  .wide { grid-column:1/-1; }
+  button { background:var(--green); border:0; border-radius:6px; color:#08210e; font-weight:700; padding:10px 18px; cursor:pointer; }
+  button:disabled { opacity:.45; cursor:wait; }
+  #out { margin-top:16px; max-width:1100px; }
+  pre { background:#141417; border:1px solid var(--line); border-radius:8px; padding:12px; overflow:auto; max-height:300px; }
+  .ok { color:var(--green); } .err { color:#e06c5a; } .hint { color:var(--dim); font-size:12px; }
+  a { color:var(--gold); }
+</style>
+</head>
+<body>
+<h1>OpenBlock · constructor web</h1>
+<p class="sub">El núcleo de OpenBlock (forge-core) corriendo en tu navegador, como el constructor de DistroForge: sin backend, sin cuentas. La config queda en tu <code>localStorage</code>. El plan de descargas se resuelve fuera (CORS): <code>forge plan config.json plan.json</code> y pégalo abajo — sin él, el proyecto sale sin las URLs.</p>
+
+<div class="grid" id="form">
+  <div class="card"><label>Nombre</label><input id="name" value="mi-server"></div>
+  <div class="card"><label>Versión de MC</label><input id="mcVersion" value="1.21.4"></div>
+  <div class="card"><label>Engine</label><select id="engine">
+    <option>paper</option><option>purpur</option><option>folia</option><option>fabric</option>
+    <option>quilt</option><option>forge</option><option>neoforge</option><option>vanilla</option>
+  </select></div>
+  <div class="card"><label>RAM (MB)</label><input id="ramMB" type="number" value="8192"></div>
+  <div class="card"><label>Jugadores</label><input id="players" type="number" value="20"></div>
+  <div class="card"><label>view-distance</label><input id="viewDistance" type="number" value="8"></div>
+  <div class="card"><label>simulation-distance</label><input id="simulationDistance" type="number" value="6"></div>
+  <div class="card"><label>Puerto</label><input id="port" type="number" value="25565"></div>
+  <div class="card"><label>Perfil</label><select id="performance">
+    <option>balanced</option><option>conservative</option><option>aggressive</option>
+  </select></div>
+  <div class="card"><label>Scripts para</label><select id="targetOS">
+    <option>both</option><option>linux</option><option>windows</option>
+  </select></div>
+  <div class="card"><label>MOTD</label><input id="motd" value="forjado con OpenBlock"></div>
+  <div class="card wide"><label>plan.json (opcional, de <code>forge plan</code>)</label>
+    <textarea id="plan" placeholder='{ "entries": [], "engineFilename": "server.jar", "engineResolved": "…" }'></textarea>
+  </div>
+</div>
+
+<p style="margin-top:16px">
+  <button id="go" disabled>cargando núcleo…</button>
+  <button id="zip" disabled style="display:none">⬇ zip del proyecto</button>
+  <span class="hint" id="ver"></span>
+</p>
+<div id="out"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+<script type="module">
+const $ = id => document.getElementById(id);
+const CAMPOS = ["name","mcVersion","engine","ramMB","players","viewDistance","simulationDistance","port","performance","targetOS","motd"];
+
+// la config vive en localStorage, como DistroForge
+for (const c of CAMPOS) {
+  const guardado = localStorage.getItem("ob-" + c);
+  if (guardado) $(c).value = guardado;
+  $(c).addEventListener("change", () => localStorage.setItem("ob-" + c, $(c).value));
+}
+
+let archivos = null;
+const init = async () => {
+  const w = await import("./pkg/forge_wasm.js");
+  $("ver").textContent = "núcleo v" + w.version();
+  const go = $("go");
+  go.disabled = false;
+  go.textContent = "generar proyecto";
+  go.onclick = () => {
+    const cfg = {
+      name: $("name").value, mcVersion: $("mcVersion").value, engine: $("engine").value,
+      serverDir: "./server", ramMB: +$("ramMB").value, players: +$("players").value,
+      viewDistance: +$("viewDistance").value, simulationDistance: +$("simulationDistance").value,
+      port: +$("port").value, motd: $("motd").value, difficulty: "normal", gamemode: "survival",
+      worldType: "normal", seed: "", onlineMode: true, whitelist: false, pvp: true, hardcore: false,
+      modpack: { kind: "none", url: "" }, performance: $("performance").value, pregenRadius: 4000,
+      backup: { enabled: true, intervalHours: 24, keep: 7 }, service: { enabled: false },
+      rcon: { enabled: true, password: "cambia-esta-8", port: 25575 }, chunkyborder: false,
+      targetOS: $("targetOS").value, customItems: [],
+    };
+    const errores = w.validate_json(JSON.stringify(cfg));
+    if (errores) { $("out").innerHTML = `<pre class="err">${errores}</pre>`; return; }
+    const planTxt = $("plan").value.trim();
+    const plan = planTxt ? JSON.parse(planTxt)
+      : { entries: [], localCopies: [], engineFilename: "server.jar", engineResolved: "(sin plan: pega el de `forge plan`)" };
+    try {
+      const files = JSON.parse(w.generate_project_json(JSON.stringify(cfg), JSON.stringify(plan), 8));
+      archivos = files;
+      const lista = Object.keys(files).sort().map(f => `<div>${f}</div>`).join("");
+      $("out").innerHTML = `<p class="ok">✓ ${Object.keys(files).length} ficheros generados en tu navegador:</p><pre>${lista}</pre>`;
+      const zb = $("zip");
+      zb.style.display = "";
+      zb.disabled = false;
+      zb.onclick = async () => {
+        const zip = new JSZip();
+        for (const [n, c] of Object.entries(files)) zip.file(n, c);
+        const blob = await zip.generateAsync({ type: "blob" });
+        const a = document.createElement("a");
+        a.href = URL.createObjectURL(blob);
+        a.download = cfg.name + ".zip";
+        a.click();
+      };
+    } catch (e) { $("out").innerHTML = `<pre class="err">${e}</pre>`; }
+  };
+};
+init().catch(e => { $("out").innerHTML = `<pre class="err">no se pudo cargar el núcleo WASM: ${e}
+¿compilaste el pkg? → wasm-pack build rust/crates/forge-wasm --target web --out-dir ../../web/pkg</pre>`; $("go").textContent = "núcleo no disponible"; });
+</script>
+</body>
+</html>
