@@ -22,6 +22,7 @@ mod guided;
 mod java;
 mod lists;
 mod logs;
+mod menu;
 mod players;
 mod pregen;
 mod rcon;
@@ -29,6 +30,7 @@ mod registry;
 mod restore;
 mod schedule;
 mod selftest;
+mod start;
 mod status;
 mod update;
 mod world;
@@ -195,6 +197,9 @@ fn main() -> ExitCode {
         Some("pregen") => pregen::pregen_cmd(&args[1..]),
         Some("world") => world::world_cmd(&args[1..]),
         Some("list") => registry::list_cmd(&args[1..]),
+        Some("start") => start::start_cmd(&args[1..]),
+        Some("watch") => start::watch_cmd(&args[1..]),
+        Some("menu") => menu::menu_cmd(&args[1..]),
         Some("export") => export::export_cmd(&args[1..]),
         Some("completions") => completions::completions_cmd(&args[1..]),
         // `new` es el guided con nombre de "crear server": lo que hace un perfil
@@ -343,6 +348,34 @@ fn plan_cmd(args: &[String]) -> ExitCode {
 fn doctor_cmd(args: &[String]) -> ExitCode {
     if args.iter().any(|a| a == "--schedule") {
         return schedule::schedule_cmd(args);
+    }
+    // --all: el doctor sobre cada server registrado (mismo resto de flags)
+    if args.iter().any(|a| a == "--all") {
+        let resto: Vec<String> = args.iter().filter(|a| *a != "--all").cloned().collect();
+        let fichas = registry::leer();
+        if fichas.is_empty() {
+            eprintln!("No hay servers registrados (forge list)");
+            return ExitCode::from(2);
+        }
+        let mut malo = false;
+        for f in fichas {
+            println!(
+                "
+== {} ({}) ==",
+                f.name, f.dir
+            );
+            let mut propios = vec!["doctor".to_string()];
+            propios.extend(resto.iter().cloned());
+            propios.push(f.dir.clone());
+            if doctor_cmd(&propios) != ExitCode::SUCCESS {
+                malo = true;
+            }
+        }
+        return if malo {
+            ExitCode::FAILURE
+        } else {
+            ExitCode::SUCCESS
+        };
     }
     let mut dir = ".".to_string();
     let mut json = false;
@@ -697,6 +730,29 @@ fn self_test_cmd(args: &[String]) -> ExitCode {
 
 /// `forge backup <dir>` — ejecuta el script de backup del server.
 fn backup_cmd(args: &[String]) -> ExitCode {
+    if args.iter().any(|a| a == "--all") {
+        let resto: Vec<String> = args.iter().filter(|a| *a != "--all").cloned().collect();
+        let fichas = registry::leer();
+        if fichas.is_empty() {
+            eprintln!("No hay servers registrados (forge list)");
+            return ExitCode::from(2);
+        }
+        let mut malo = false;
+        for f in fichas {
+            println!("== backup de {} ({}) ==", f.name, f.dir);
+            let mut propios = vec!["backup".to_string()];
+            propios.extend(resto.iter().cloned());
+            propios.push(f.dir.clone());
+            if backup_cmd(&propios) != ExitCode::SUCCESS {
+                malo = true;
+            }
+        }
+        return if malo {
+            ExitCode::FAILURE
+        } else {
+            ExitCode::SUCCESS
+        };
+    }
     let pos: Vec<&String> = args.iter().filter(|a| !a.starts_with('-')).collect();
     let Some(dir) = pos.first().copied() else {
         eprintln!("uso: forge backup <dir> [--rclone <remote:ruta>]");

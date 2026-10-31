@@ -306,6 +306,29 @@ fn actualizar_catalogo(cfg: &forge_core::ServerConfig, raiz: &Path) -> (Vec<Stri
             }
         }
     }
+    // customs con URL: re-descarga tal cual (la URL ya apunta a la versión buena)
+    for c in cfg
+        .custom_items
+        .iter()
+        .filter(|c| c.url.as_deref().is_some_and(|u| !u.is_empty()))
+    {
+        let carpeta2 = if c.kind == "mod" { "mods" } else { "plugins" };
+        let d = raiz.join(carpeta2);
+        fs::create_dir_all(&d).ok();
+        let destino = d.join(format!("{}.jar", c.name));
+        println!("↓ {} (custom) …", c.name);
+        let opts = forge_api::net::OpcionesDescarga::default();
+        match forge_api::net::download_to(c.url.as_deref().unwrap_or(""), &destino, &opts) {
+            Ok(()) => {
+                println!("✓ {} re-descargado", c.name);
+                actualizados.push(c.name.clone());
+            }
+            Err(e) => {
+                eprintln!("✗ {}: {e}", c.name);
+                fallos += 1;
+            }
+        }
+    }
     (actualizados, fallos)
 }
 

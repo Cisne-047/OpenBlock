@@ -18,11 +18,17 @@ use std::time::{SystemTime, UNIX_EPOCH};
 pub fn restore_cmd(args: &[String]) -> ExitCode {
     let mut dir: Option<&String> = None;
     let mut fichero: Option<String> = None;
+    let mut remoto: Option<String> = None;
     let mut i = 0;
     while i < args.len() {
         match args[i].as_str() {
             "--file" if i + 1 < args.len() => {
                 fichero = Some(args[i + 1].clone());
+                i += 2;
+            }
+            // trae el backup más nuevo de un remoto rclone antes de restaurar
+            "--rclone" if i + 1 < args.len() => {
+                remoto = Some(args[i + 1].clone());
                 i += 2;
             }
             // `--latest` se acepta por escribirlo mentalmente, pero es el default
@@ -66,6 +72,17 @@ pub fn restore_cmd(args: &[String]) -> ExitCode {
         if !esperar_puerto_libre(cfg.port, 90) {
             eprintln!("El server no se apagó en 90 s (¿guardando chunks?): inténtalo otra vez");
             return ExitCode::FAILURE;
+        }
+    }
+
+    // 0b) backup remoto: rclone trae el más nuevo a backups/
+    if let Some(r) = &remoto {
+        match traer_remoto(&raiz, r) {
+            Ok(f) => fichero = Some(f.to_string_lossy().to_string()),
+            Err(e) => {
+                eprintln!("rclone: {e}");
+                return ExitCode::FAILURE;
+            }
         }
     }
 
@@ -136,6 +153,38 @@ pub fn restore_cmd(args: &[String]) -> ExitCode {
 }
 
 /// el backup más nuevo de backups/ (backup-*), por fecha de modificación
+/// `rclone lsf` del remoto, se queda con el backup-* más nuevo y lo copia
+fn traer_remoto(raiz: &Path, remoto: &str) -> Result<PathBuf, String> {
+    let out = std::process::Command::new("rclone")
+        .args(["lsf", remoto])
+        .output()
+        .map_err(|_| "rclone no está instalado (https://rclone.org/install)".to_string())?;
+    if !out.status.success() {
+        return Err(String::from_utf8_lossy(&out.stderr).trim().to_string());
+    }
+    let nuevo = String::from_utf8_lossy(&out.stdout)
+        .lines()
+        .filter(|l| l.starts_with("backup-"))
+        .max()
+        .ok_or("el remoto no tiene backups (backup-*)")?
+        .to_string();
+    let destino = raiz.join("backups").join(&nuevo);
+    fs::create_dir_all(raiz.join("backups")).ok();
+    let out = std::process::Command::new("rclone")
+        .args([
+            "copy",
+            &format!("{remoto}/{nuevo}"),
+            &destino.to_string_lossy(),
+        ])
+        .output()
+        .map_err(|e| e.to_string())?;
+    if !out.status.success() {
+        return Err(String::from_utf8_lossy(&out.stderr).trim().to_string());
+    }
+    println!("↓ {nuevo} traído de {remoto}");
+    Ok(destino)
+}
+
 fn backup_mas_reciente(raiz: &Path) -> Option<PathBuf> {
     let backups = raiz.join("backups");
     let mut mejor: Option<(SystemTime, PathBuf)> = None;

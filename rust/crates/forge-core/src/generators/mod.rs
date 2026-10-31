@@ -4,6 +4,7 @@
 //! Ninguno toca el disco, la red ni el reloj. Este módulo es el port de
 //! `src/generators/index.ts`, incluido `generateProject`.
 
+pub mod dockerfile;
 pub mod jvm;
 pub mod ops;
 pub mod paper;
@@ -201,6 +202,8 @@ pub fn generate_project(cfg: &ServerConfig, plan: &DownloadPlan, cores: u32) -> 
         files.insert("install.sh".into(), scripts::install_sh(cfg, plan));
         files.insert("firewall.sh".into(), ops::firewall_sh(cfg));
         files.insert("backup.sh".into(), ops::backup_sh(cfg));
+        // el contenedor es linux siempre: el Dockerfile viaja con los .sh
+        files.insert("Dockerfile".into(), dockerfile::dockerfile(cfg, plan));
     }
     if cfg.target_os != TargetOs::Linux {
         files.insert("install.ps1".into(), scripts::install_ps1(cfg, plan));

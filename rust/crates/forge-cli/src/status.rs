@@ -59,13 +59,20 @@ pub fn status_cmd(args: &[String]) -> ExitCode {
         let seg: u64 = args.get(i + 1).and_then(|s| s.parse().ok()).unwrap_or(180);
         return esperar_sano(args, seg);
     }
-    // --webhook URL: manda un aviso (formato Discord) si algo no va — para
-    // programarlo con cron/timer; no es un proceso residente
+    // --webhook URL: aviso formato Discord; --telegram <chat_id>: vía bot de
+    // Telegram (token en OPENBLOCK_TG_TOKEN). Ambos para cron/timer, no residentes.
     if let Some(i) = args.iter().position(|a| a == "--webhook") {
         if let Some(url) = args.get(i + 1) {
             return alerta(args, url);
         }
         eprintln!("--webhook necesita la URL (formato Discord: el JSON {{content}})");
+        return ExitCode::from(2);
+    }
+    if let Some(i) = args.iter().position(|a| a == "--telegram") {
+        if let Some(chat) = args.get(i + 1) {
+            return alerta_telegram(args, chat);
+        }
+        eprintln!("--telegram necesita el chat_id (y el bot en OPENBLOCK_TG_TOKEN)");
         return ExitCode::from(2);
     }
     let Some(dir) = args.iter().find(|a| !a.starts_with('-')) else {
@@ -216,6 +223,46 @@ fn primer_tps(salida: &str) -> Option<f64> {
         .take_while(|c| c.is_ascii_digit() || *c == '.')
         .collect();
     num.parse().ok()
+}
+
+/// igual que `alerta` pero por el bot de Telegram del usuario
+fn alerta_telegram(args: &[String], chat: &str) -> ExitCode {
+    let Ok(token) = std::env::var("OPENBLOCK_TG_TOKEN") else {
+        eprintln!("Falta OPENBLOCK_TG_TOKEN (el token del bot, de @BotFather)");
+        return ExitCode::from(2);
+    };
+    let Some(dir) = args.iter().find(|a| !a.starts_with('-')) else {
+        eprintln!("uso: forge status <dir> --telegram <chat_id>");
+        return ExitCode::from(2);
+    };
+    let (cfg, _) = match cargar_cfg(dir) {
+        Ok(v) => v,
+        Err(e) => {
+            eprintln!("{e}");
+            return ExitCode::FAILURE;
+        }
+    };
+    let aviso = if !puerto_abierto(cfg.port) {
+        Some(format!("🔴 {} está CAÍDO (puerto {})", cfg.name, cfg.port))
+    } else {
+        None // el aviso de TPS bajo se queda exclusivo de spark+webhook por ahora
+    };
+    let Some(msg) = aviso else {
+        println!("✓ {}: sin novedad (no se avisa)", cfg.name);
+        return ExitCode::SUCCESS;
+    };
+    let url = format!("https://api.telegram.org/bot{token}/sendMessage");
+    let cuerpo = serde_json::json!({ "chat_id": chat, "text": msg }).to_string();
+    match postear(&url, &cuerpo) {
+        Ok(()) => {
+            println!("✓ avisado por Telegram: {msg}");
+            ExitCode::SUCCESS
+        }
+        Err(e) => {
+            eprintln!("✗ el aviso no llegó: {e}");
+            ExitCode::FAILURE
+        }
+    }
 }
 
 /// POST JSON sin librería: curl ya es dependencia de facto del proyecto

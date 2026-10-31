@@ -73,7 +73,7 @@ rem OPENBLOCK_AUTORESTART=0 lo desactiva para esa ejecucion.
 if %errorlevel%==0 exit /b 0
 if not "%OPENBLOCK_AUTORESTART%"=="0" (
   echo == Crash. Reinicio en 5 s; OPENBLOCK_AUTORESTART=0 desactiva ==
-  timeout /t 5 /nobreak >nul
+  ping -n 6 127.0.0.1 >nul
   goto ob_loop
 )
 exit /b %errorlevel%

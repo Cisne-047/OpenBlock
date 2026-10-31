@@ -1,6 +1,7 @@
 import type { DownloadPlan } from "../plan.js";
 import type { ServerConfig } from "../types.js";
 import { engineById, javaMajorFor } from "../catalog.js";
+import { dockerfile } from "./dockerfile.js";
 import { jvmArgsLine } from "./jvm.js";
 import { serverProperties } from "./properties.js";
 import { bukkitYml, paperGlobalYml, paperWorldDefaultsYml, spigotYml } from "./paper.js";
@@ -99,6 +100,8 @@ export function generateProject(cfg: ServerConfig, plan: DownloadPlan, cores: nu
     files["install.sh"] = installSh(cfg, plan, javaMajorFor(cfg.mcVersion));
     files["firewall.sh"] = firewallSh(cfg);
     files["backup.sh"] = backupSh(cfg);
+    // el contenedor es linux siempre: el Dockerfile viaja con los .sh
+    files["Dockerfile"] = dockerfile(cfg, plan);
   }
   if (cfg.targetOS !== "linux") {
     files["install.ps1"] = installPs1(cfg, plan, javaMajorFor(cfg.mcVersion));
