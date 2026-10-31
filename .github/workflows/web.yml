@@ -20,9 +20,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
-  pages: write
-  id-token: write
+  contents: write
 
 concurrency:
   group: pages
@@ -44,24 +42,13 @@ jobs:
       - name: compilar el pkg
         run: wasm-pack build rust/crates/forge-wasm --target web --out-dir ../../web/pkg
 
-      - name: páginas
-        uses: actions/configure-pages@v5
+      # el GITHUB_TOKEN no puede crear el site de Pages desde una acción
+      # ("Resource not accessible by integration"), así que se despliega a la
+      # rama gh-pages y Pages se sirve de ahí. Paso único a mano, una vez:
+      #   Settings → Pages → Source: Deploy from a branch → gh-pages / (root)
+      - name: publicar en gh-pages
+        uses: peaceiris/actions-gh-pages@v4
         with:
-          # habilita Pages en el repo la primera vez, sin tocar ajustes a mano
-          enablement: true
-
-      - name: subir artefacto
-        uses: actions/upload-pages-artifact@v3
-        with:
-          path: web
-
-  deploy:
-    needs: build
-    runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    steps:
-      - name: desplegar
-        id: deployment
-        uses: actions/deploy-pages@v4
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: web
+          force_orphan: true
