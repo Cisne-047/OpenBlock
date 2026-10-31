@@ -61,7 +61,17 @@ if [ ! -f "$JAR" ]; then
   echo "Falta $JAR. Ejecuta primero ./install.sh" >&2
   exit 1
 fi
-exec "$JAVA" $JVM_ARGS -jar "$JAR" {nogui}
+# bucle anti-crash: un `stop` limpio sale (código 0); un crash reintenta a los 5 s.
+# OPENBLOCK_AUTORESTART=0 lo desactiva para esa ejecución. El `|| CODE=$?` es para
+# que `set -e` no mate el script justo en el crash que queremos capturar.
+while true; do
+  CODE=0
+  "$JAVA" $JVM_ARGS -jar "$JAR" {nogui} || CODE=$?
+  [ "$CODE" -eq 0 ] && exit 0
+  if [ "${{OPENBLOCK_AUTORESTART:-1}}" != "1" ]; then exit "$CODE"; fi
+  echo "== Crash (código $CODE). Reinicio en 5 s; OPENBLOCK_AUTORESTART=0 desactiva ==" >&2
+  sleep 5
+done
 "#
     )
 }

@@ -39,7 +39,17 @@ if not exist "%JAR%" (
   echo Falta %JAR%. Ejecuta primero install.bat / install.ps1 1>&2
   exit /b 1
 )
+rem bucle anti-crash: un stop limpio sale (codigo 0); un crash reintenta a los 5 s.
+rem OPENBLOCK_AUTORESTART=0 lo desactiva para esa ejecucion.
+:ob_loop
 "%JAVA%" %JVM_ARGS% -jar "%JAR%" {nogui}
+if %errorlevel%==0 exit /b 0
+if not "%OPENBLOCK_AUTORESTART%"=="0" (
+  echo == Crash. Reinicio en 5 s; OPENBLOCK_AUTORESTART=0 desactiva ==
+  timeout /t 5 /nobreak >nul
+  goto ob_loop
+)
+exit /b %errorlevel%
 "#
     )
 }
