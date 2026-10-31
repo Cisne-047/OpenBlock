@@ -12,12 +12,18 @@
 mod advanced;
 mod apply;
 mod bench;
+mod console;
 mod detect;
 mod doctor;
 mod guided;
 mod java;
+mod lists;
+mod players;
 mod rcon;
+mod restore;
 mod selftest;
+mod status;
+mod update;
 
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -33,6 +39,9 @@ forge — forja servidores de Minecraft según tu hardware (Windows/Linux)
 
   forge bench                     Mide CPU y disco (~2 s) y saca el perfil
   forge detect [--json]           Hardware + tier + recomendación
+  forge versions [n]              Últimas releases de Minecraft (Mojang, live)
+  forge builds --engine E --mc V [n]
+                                  Builds del engine: lo que acepta --build
   forge plan <config> [out.json]  Resuelve el plan contra las APIs
   forge generate [config] [...]   Genera el proyecto; --zip out.zip lo empaqueta
   forge install [config] [...]    Como generate, y además baja todo y deja el
@@ -40,6 +49,16 @@ forge — forja servidores de Minecraft según tu hardware (Windows/Linux)
   forge dump <config> <plan> <dir> [n]
                                   Escribe el proyecto desde config y plan
   forge info <dir>                Config del server instalado
+  forge status <dir>              ¿Vivo? Jugadores, TPS (spark) y cómo entrar
+  forge console <dir>             Consola del server por RCON (exit para salir)
+  forge update <dir> [--build N]  Sube de build/engine sin tocar el mundo
+      [--loader-build N] [--mc V] [--dry-run]
+  forge whitelist <dir> a|r|l [jugadores…]
+  forge op <dir> add|remove|list [jugadores…]
+                                  Gente en whitelist.json/ops.json (UUID resuelto;
+                                  si el server está arriba, también por RCON)
+  forge restore <dir> [--file F|--latest]
+                                  Restaura un backup (mundos actuales apartados)
   forge doctor [--dir D]          Mini-IA: dry run del server, errores y avisos
       --boot                      arranca el server de verdad y lee su log
       --yes                       aplica los fixes seguros (los considerables no)
@@ -137,6 +156,15 @@ fn main() -> ExitCode {
         }
         Some("backup") => backup_cmd(&args[1..]),
         Some("stop") => stop_cmd(&args[1..]),
+        // día a día de un server ya instalado
+        Some("status") => status::status_cmd(&args[1..]),
+        Some("console") => console::console_cmd(&args[1..]),
+        Some("update") => update::update_cmd(&args[1..]),
+        Some("restore") => restore::restore_cmd(&args[1..]),
+        Some("whitelist") => players::whitelist_cmd(&args[1..]),
+        Some("op") => players::op_cmd(&args[1..]),
+        Some("versions") => lists::versions_cmd(&args[1..]),
+        Some("builds") => lists::builds_cmd(&args[1..]),
         // `smoke` era el alias del TS (y el nombre del job de CI que lo ejecuta).
         Some("self-test") | Some("smoke") => self_test_cmd(&args[1..]),
         Some("latest") => latest_cmd(),
